@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Overview Path Tracer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 420px;
+            background: #252525;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 100vh;
+            flex-shrink: 0;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 15px;
+            font-size: 18px;
+            color: #4dcbbf;
+        }
+
+        .sidebar h3 {
+            margin: 20px 0 10px;
+            font-size: 14px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .path-entry {
+            margin-bottom: 12px;
+            background: #333;
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .path-entry label {
+            display: block;
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+
+        .path-entry input[type="text"] {
+            width: 100%;
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+        }
+
+        .path-entry input[type="text"]:focus {
+            outline: none;
+            border-color: #4dcbbf;
+        }
+
+        .path-entry.active {
+            border: 2px solid #4dcbbf;
+        }
+
+        .path-entry .path-controls {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+        }
+
+        .path-entry button {
+            padding: 4px 8px;
+            font-size: 11px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .path-entry .draw-btn {
+            background: #4dcbbf;
+            color: #000;
+        }
+
+        .path-entry .draw-btn.active {
+            background: #ffd700;
+        }
+
+        .path-entry .clear-btn {
+            background: #666;
+            color: #fff;
+        }
+
+        .path-entry .clear-btn:hover {
+            background: #f44336;
+        }
+
+        .label-preview {
+            margin-top: 8px;
+            padding: 8px;
+            background: #222;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .label-preview .value {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .label-preview .name {
+            color: #7d7f82;
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+
+        .label-preview .sublabel {
+            color: #4dcbbf;
+            font-size: 11px;
+        }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            background: #333;
+            padding: 10px 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .toolbar button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .toolbar button.primary {
+            background: #4dcbbf;
+            color: #000;
+        }
+
+        .toolbar button.secondary {
+            background: #555;
+            color: #fff;
+        }
+
+        .toolbar button:hover {
+            opacity: 0.85;
+        }
+
+        .mode-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .mode-buttons button {
+            padding: 6px 12px;
+        }
+
+        .mode-buttons button.active {
+            background: #4dcbbf;
+            color: #000;
+        }
+
+        .mode-buttons button:not(.active) {
+            background: #555;
+            color: #fff;
+        }
+
+        .toolbar .file-input-wrapper {
+            position: relative;
+        }
+
+        .toolbar input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+            cursor: crosshair;
+        }
+
+        .canvas-container img {
+            display: block;
+        }
+
+        .canvas-container svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .canvas-container svg.interactive {
+            pointer-events: auto;
+        }
+
+        .coordinates {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .info-box {
+            background: #333;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        .export-area {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #444;
+        }
+
+        .export-area textarea {
+            width: 100%;
+            height: 150px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            resize: vertical;
+            margin-top: 10px;
+        }
+
+        .export-area button {
+            margin-top: 8px;
+            width: 100%;
+            padding: 8px;
+            background: #4dcbbf;
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .align-select {
+            margin-top: 6px;
+        }
+
+        .align-select label {
+            font-size: 11px;
+            color: #888;
+        }
+
+        .align-select select {
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 3px;
+            padding: 4px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+        }
+
+        .modal-content {
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-content h3 {
+            margin: 0 0 10px 0;
+            color: #4dcbbf;
+        }
+
+        .modal-content textarea {
+            width: 100%;
+            height: 300px;
+            background: #222;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            resize: vertical;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .modal-buttons button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .modal-buttons .primary {
+            background: #4dcbbf;
+            color: #000;
+        }
+
+        .modal-buttons .secondary {
+            background: #555;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <h2>Energy Overview Path Tracer</h2>
+        
+        <div class="info-box">
+            <strong>Instructions:</strong><br>
+            1. Click "Draw" on a path to start tracing<br>
+            2. Click on the image to add points (first point = start)<br>
+            3. Hold <strong>Shift</strong> to snap to horizontal/vertical lines<br>
+            4. Edit the text field to adjust paths manually<br>
+            5. Esc or End button to stop drawing<br>
+            <br>
+            <strong style="color: #ffd700;">Path Direction:</strong><br>
+            Route paths must be drawn FROM source TO destination.<br>
+            The pulse animates from the first point to the last point.<br>
+            A green dot marks the START, red dot marks the END.
+        </div>
+
+        <h3>Route Paths (Pulse Animations)</h3>
+        <div id="routePaths"></div>
+
+        <h3>Label Paths (Text Labels)</h3>
+        <div id="labelPaths"></div>
+
+        <div class="export-area">
+            <h3 style="margin-top: 0;">Import / Export</h3>
+            <button id="loadJsonBtn" style="background: #555; margin-bottom: 5px;">Load from JSON</button>
+            <button id="exportBtn">Copy JSON for Node-RED</button>
+            <textarea id="exportArea" readonly placeholder="Click export to generate JSON configuration..."></textarea>
+        </div>
+    </div>
+    
+    <!-- Load JSON Modal -->
+    <div id="loadJsonModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>Load Paths from JSON</h3>
+            <p style="font-size: 12px; color: #888; margin-bottom: 10px;">Paste the exported JSON to load paths into the form.</p>
+            <textarea id="loadJsonInput" placeholder="Paste JSON here..."></textarea>
+            <div class="modal-buttons">
+                <button id="modalCancelBtn" class="secondary">Cancel</button>
+                <button id="modalLoadBtn" class="primary">Load</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-area">
+        <div class="toolbar">
+            <div class="mode-buttons">
+                <button id="moveBtn" class="active">Move (M)</button>
+                <button id="lineBtn">Line (L)</button>
+            </div>
+            <button id="endBtn" class="secondary" style="background: #f59e0b; color: #000; display: none;">End Drawing (Esc)</button>
+            <span id="modeIndicator" style="color: #4dcbbf; font-size: 13px;">Click a path's "Draw" button to start</span>
+            <div style="flex: 1;"></div>
+            <div class="file-input-wrapper">
+                <button class="secondary">Load Custom Image</button>
+                <input type="file" id="imageInput" accept="image/*">
+            </div>
+            <button class="secondary" id="resetImageBtn">Reset to house.png</button>
+        </div>
+
+        <div class="canvas-wrapper">
+            <div class="canvas-container" id="canvasContainer">
+                <img id="baseImage" src="house.png" alt="House base">
+                <svg id="overlay" preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                        <filter id="pulseBlur" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="2.0" />
+                        </filter>
+                    </defs>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="coordinates" id="coordinates">
+        X: 0, Y: 0
+    </div>
+
+    <script>
+        // Configuration matching energy-overview.html
+        const REF_WIDTH = 1056;
+        const REF_HEIGHT = 992;
+        const INACTIVE_ROUTE_COLOR = "#7a7b7e";
+        const PULSE_COLOR = "#4dcbbf";
+        
+        // Scaled values
+        let scaleFactor = 1;
+        const getStrokeWidth = () => 3.2 * scaleFactor;
+        const getLabelStrokeWidth = () => 2 * scaleFactor;
+        const getLabelValueFontSize = () => 42 * scaleFactor;
+        const getLabelNameFontSize = () => 32 * scaleFactor;
+        const getLabelSubFontSize = () => 32 * scaleFactor;
+        const getLabelTextOffsetX = () => 16 * scaleFactor;
+        const getLabelValueLabelGap = () => 8 * scaleFactor;
+        const getLabelLabelSubGap = () => 10 * scaleFactor;
+
+        // Route paths from energy-overview
+        const routePathDefs = {
+            solarToInverter: { 
+                path: "M 427 295 L 484 332 L 484 533", 
+                description: "Solar -> Inverter"
+            },
+            inverterToHome1: { 
+                path: "M 513 532 L 513 445 L 808 451 L 810 549", 
+                description: "Inverter -> Home (left)"
+            },
+            inverterToHome2: { 
+                path: "M 513 532 L 513 445 L 966 455", 
+                description: "Inverter -> Home (right)"
+            },
+            inverterToGrid: { 
+                path: "M 451 631 L 401 631 L 403 821 L 449 848", 
+                description: "Inverter <-> Grid"
+            },
+            inverterToBattery: { 
+                path: "M 499 649 L 499 748 L 594 742", 
+                description: "Inverter <-> Battery"
+            },
+            inverterToCar: { 
+                path: "M 453 586 L 388 585 L 257 587 L 255 658", 
+                description: "Inverter <-> Car"
+            }
+        };
+
+        // Label paths from energy-overview
+        const labelPathDefs = {
+            solar: { path: "M 608 41 L 608 300", align: "top", label: "SOLAR", dummyValue: "2.4 kW", dummySublabel: "12.5 kWh" },
+            home: { path: "M 776 41 L 776 445", align: "top", label: "HOME", dummyValue: "1.8 kW", dummySublabel: "" },
+            grid: { path: "M 448 850 L 448 921", align: "bottom", label: "GRID", dummyValue: "0.3 kW", dummySublabel: "Importing" },
+            battery: { path: "M 643 772 L 643 921", align: "bottom", label: "BATTERY", dummyValue: "85%", dummySublabel: "Charging" },
+            car: { path: "M 103 820 L 103 921", align: "bottom", label: "CAR", dummyValue: "11 kW", dummySublabel: "2h 15m left" }
+        };
+
+        // State
+        let currentDrawingPath = null;
+        let drawMode = 'M';
+        let currentPoints = [];
+        let imageLoaded = false;
+        let mousePos = null; // Track mouse position for line preview
+
+        // DOM elements
+        const baseImage = document.getElementById('baseImage');
+        const overlay = document.getElementById('overlay');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const coordinatesDiv = document.getElementById('coordinates');
+        const modeIndicator = document.getElementById('modeIndicator');
+        const moveBtn = document.getElementById('moveBtn');
+        const lineBtn = document.getElementById('lineBtn');
+        const endBtn = document.getElementById('endBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const exportArea = document.getElementById('exportArea');
+        const imageInput = document.getElementById('imageInput');
+        const resetImageBtn = document.getElementById('resetImageBtn');
+        const routePathsContainer = document.getElementById('routePaths');
+        const labelPathsContainer = document.getElementById('labelPaths');
+
+        // Initialize path entries
+        function createPathEntry(name, def, isLabel) {
+            const div = document.createElement('div');
+            div.className = 'path-entry';
+            div.id = `entry-${name}`;
+
+            let extraHtml = '';
+            if (isLabel) {
+                extraHtml = `
+                    <div class="align-select" style="margin-top: 6px;">
+                        <label style="font-size: 11px; color: #888;">Align:
+                            <select id="align-${name}">
+                                <option value="top" ${def.align === 'top' ? 'selected' : ''}>Top</option>
+                                <option value="bottom" ${def.align === 'bottom' ? 'selected' : ''}>Bottom</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div style="margin-top: 6px;">
+                        <label style="font-size: 11px; color: #888;">Label:</label>
+                        <input type="text" id="label-${name}" value="${def.label || name.toUpperCase()}" 
+                            style="width: 100%; background: #222; color: #fff; border: 1px solid #444; border-radius: 3px; padding: 4px; font-size: 11px; margin-top: 2px;">
+                    </div>
+                    <div class="label-preview">
+                        <div class="value">${def.dummyValue}</div>
+                        <div class="name" id="preview-label-${name}">${def.label || name.toUpperCase()}</div>
+                        <div class="sublabel">${def.dummySublabel}</div>
+                    </div>
+                `;
+            }
+
+            div.innerHTML = `
+                <label>${name} <small style="color:#666;">${def.description || ''}</small></label>
+                <input type="text" id="path-${name}" value="${def.path}" placeholder="M x y L x y...">
+                <div class="path-controls">
+                    <button class="draw-btn" data-path="${name}" data-label="${isLabel}">Draw</button>
+                    <button class="clear-btn" data-path="${name}">Clear</button>
+                </div>
+                ${extraHtml}
+            `;
+
+            return div;
+        }
+
+        // Initialize UI
+        function initUI() {
+            // Route paths
+            for (const [name, def] of Object.entries(routePathDefs)) {
+                routePathsContainer.appendChild(createPathEntry(name, def, false));
+            }
+
+            // Label paths
+            for (const [name, def] of Object.entries(labelPathDefs)) {
+                labelPathsContainer.appendChild(createPathEntry(name, def, true));
+            }
+
+            // Add event listeners
+            document.querySelectorAll('.draw-btn').forEach(btn => {
+                btn.addEventListener('click', () => startDrawing(btn.dataset.path, btn.dataset.label === 'true'));
+            });
+
+            document.querySelectorAll('.clear-btn').forEach(btn => {
+                btn.addEventListener('click', () => clearPath(btn.dataset.path));
+            });
+
+            document.querySelectorAll('.path-entry input[type="text"]').forEach(input => {
+                input.addEventListener('input', () => {
+                    renderAllPaths();
+                });
+            });
+
+            // Align select and label input listeners for labels
+            for (const name of Object.keys(labelPathDefs)) {
+                const select = document.getElementById(`align-${name}`);
+                if (select) {
+                    select.addEventListener('change', () => renderAllPaths());
+                }
+                
+                const labelInput = document.getElementById(`label-${name}`);
+                if (labelInput) {
+                    labelInput.addEventListener('input', () => {
+                        // Update preview
+                        const previewLabel = document.getElementById(`preview-label-${name}`);
+                        if (previewLabel) {
+                            previewLabel.textContent = labelInput.value || name.toUpperCase();
+                        }
+                        renderAllPaths();
+                    });
+                }
+            }
+        }
+
+        // Image loading
+        function onImageLoad() {
+            const w = baseImage.naturalWidth;
+            const h = baseImage.naturalHeight;
+            
+            // Calculate scale factor for path coordinates (ratio of actual to reference)
+            scaleFactor = ((w / REF_WIDTH) + (h / REF_HEIGHT)) / 2;
+            
+            // Display the image scaled down to reference dimensions for convenient editing
+            overlay.setAttribute('viewBox', `0 0 ${w} ${h}`);
+            overlay.style.width = REF_WIDTH + 'px';
+            overlay.style.height = REF_HEIGHT + 'px';
+            baseImage.style.width = REF_WIDTH + 'px';
+            baseImage.style.height = REF_HEIGHT + 'px';
+            
+            const blurFilter = overlay.querySelector('#pulseBlur feGaussianBlur');
+            if (blurFilter) {
+                blurFilter.setAttribute('stdDeviation', (2.0 * scaleFactor).toFixed(1));
+            }
+            
+            imageLoaded = true;
+            renderAllPaths();
+        }
+
+        baseImage.addEventListener('load', onImageLoad);
+        if (baseImage.complete) {
+            onImageLoad();
+        }
+
+        // Custom image loading
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    imageLoaded = false;
+                    baseImage.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        resetImageBtn.addEventListener('click', () => {
+            imageLoaded = false;
+            baseImage.src = 'house.png';
+        });
+
+        // Scale path coordinates
+        function scalePath(pathData) {
+            return pathData.replace(/(-?\d+\.?\d*)/g, (match) => {
+                return (parseFloat(match) * scaleFactor).toFixed(1);
+            });
+        }
+
+        // Render all paths to SVG
+        function renderAllPaths() {
+            if (!imageLoaded) return;
+
+            // Clear existing paths (keep defs)
+            const defs = overlay.querySelector('defs');
+            overlay.innerHTML = '';
+            overlay.appendChild(defs);
+
+            // Render route paths
+            for (const name of Object.keys(routePathDefs)) {
+                const input = document.getElementById(`path-${name}`);
+                if (input && input.value.trim()) {
+                    renderRoutePath(name, input.value.trim());
+                }
+            }
+
+            // Render label paths
+            for (const name of Object.keys(labelPathDefs)) {
+                const input = document.getElementById(`path-${name}`);
+                const alignSelect = document.getElementById(`align-${name}`);
+                if (input && input.value.trim()) {
+                    const align = alignSelect ? alignSelect.value : labelPathDefs[name].align;
+                    renderLabelPath(name, input.value.trim(), align, labelPathDefs[name]);
+                }
+            }
+
+            // Render drawing points if actively drawing
+            if (currentDrawingPath) {
+                renderDrawingPoints();
+            }
+        }
+
+        function renderRoutePath(name, pathData) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            const isActive = currentDrawingPath === name;
+            
+            const path = document.createElementNS(svgNS, "path");
+            path.setAttribute("d", scalePath(pathData));
+            path.setAttribute("stroke", isActive ? "#ffd700" : INACTIVE_ROUTE_COLOR);
+            path.setAttribute("stroke-opacity", "0.6");
+            path.setAttribute("stroke-width", getStrokeWidth().toFixed(1));
+            path.setAttribute("fill", "none");
+            path.setAttribute("data-name", name);
+            overlay.appendChild(path);
+            
+            // Add start/end markers to show direction
+            const length = path.getTotalLength();
+            if (length > 1) {
+                const startPt = path.getPointAtLength(0);
+                const endPt = path.getPointAtLength(length);
+                const markerRadius = 6 * scaleFactor;
+                
+                // Start marker (green) - where pulse begins
+                const startMarker = document.createElementNS(svgNS, "circle");
+                startMarker.setAttribute("cx", startPt.x.toFixed(1));
+                startMarker.setAttribute("cy", startPt.y.toFixed(1));
+                startMarker.setAttribute("r", markerRadius.toFixed(1));
+                startMarker.setAttribute("fill", "#22c55e");
+                startMarker.setAttribute("stroke", "#fff");
+                startMarker.setAttribute("stroke-width", "1");
+                overlay.appendChild(startMarker);
+                
+                // End marker (red) - where pulse ends
+                const endMarker = document.createElementNS(svgNS, "circle");
+                endMarker.setAttribute("cx", endPt.x.toFixed(1));
+                endMarker.setAttribute("cy", endPt.y.toFixed(1));
+                endMarker.setAttribute("r", markerRadius.toFixed(1));
+                endMarker.setAttribute("fill", "#ef4444");
+                endMarker.setAttribute("stroke", "#fff");
+                endMarker.setAttribute("stroke-width", "1");
+                overlay.appendChild(endMarker);
+            }
+        }
+
+        function renderLabelPath(name, pathData, align, def) {
+            const svgNS = "http://www.w3.org/2000/svg";
+            
+            // Draw the path line
+            const path = document.createElementNS(svgNS, "path");
+            path.setAttribute("d", scalePath(pathData));
+            path.setAttribute("stroke", currentDrawingPath === name ? "#ffd700" : INACTIVE_ROUTE_COLOR);
+            path.setAttribute("stroke-opacity", "0.7");
+            path.setAttribute("stroke-width", getLabelStrokeWidth().toFixed(1));
+            path.setAttribute("fill", "none");
+            path.setAttribute("data-name", name);
+            overlay.appendChild(path);
+
+            // Get path endpoints for text positioning
+            const length = path.getTotalLength();
+            if (length < 1) return;
+
+            const p0 = path.getPointAtLength(0);
+            const p1 = path.getPointAtLength(length);
+            const topPoint = p0.y <= p1.y ? p0 : p1;
+            const bottomPoint = p0.y <= p1.y ? p1 : p0;
+            const rightX = Math.max(p0.x, p1.x) + getLabelTextOffsetX();
+
+            // Value text
+            const valueText = document.createElementNS(svgNS, "text");
+            valueText.setAttribute("fill", "#ffffff");
+            valueText.setAttribute("text-anchor", "start");
+            valueText.setAttribute("font-size", getLabelValueFontSize().toFixed(1));
+            valueText.setAttribute("font-family", "system-ui, -apple-system, sans-serif");
+            valueText.textContent = def.dummyValue;
+
+            // Name text - use label from input field if available
+            const labelInput = document.getElementById(`label-${name}`);
+            const labelText = labelInput ? labelInput.value : (def.label || name.toUpperCase());
+            
+            const nameText = document.createElementNS(svgNS, "text");
+            nameText.setAttribute("fill", "#7d7f82");
+            nameText.setAttribute("text-anchor", "start");
+            nameText.setAttribute("font-size", getLabelNameFontSize().toFixed(1));
+            nameText.setAttribute("font-family", "system-ui, -apple-system, sans-serif");
+            nameText.setAttribute("letter-spacing", (1 * scaleFactor).toFixed(1));
+            nameText.textContent = labelText;
+
+            // Sublabel text
+            const subText = document.createElementNS(svgNS, "text");
+            subText.setAttribute("fill", PULSE_COLOR);
+            subText.setAttribute("text-anchor", "start");
+            subText.setAttribute("font-size", getLabelSubFontSize().toFixed(1));
+            subText.setAttribute("font-family", "system-ui, -apple-system, sans-serif");
+            subText.textContent = def.dummySublabel;
+
+            if (align === "top") {
+                valueText.setAttribute("dominant-baseline", "hanging");
+                nameText.setAttribute("dominant-baseline", "hanging");
+                subText.setAttribute("dominant-baseline", "hanging");
+                const valueY = topPoint.y;
+                const labelY = valueY + getLabelValueFontSize() + getLabelValueLabelGap();
+                const subY = labelY + getLabelNameFontSize() + getLabelLabelSubGap();
+                valueText.setAttribute("x", rightX.toFixed(1));
+                valueText.setAttribute("y", valueY.toFixed(1));
+                nameText.setAttribute("x", rightX.toFixed(1));
+                nameText.setAttribute("y", labelY.toFixed(1));
+                subText.setAttribute("x", rightX.toFixed(1));
+                subText.setAttribute("y", subY.toFixed(1));
+            } else {
+                nameText.setAttribute("dominant-baseline", "auto");
+                valueText.setAttribute("dominant-baseline", "auto");
+                subText.setAttribute("dominant-baseline", "hanging");
+                const labelBottomY = bottomPoint.y;
+                const valueBottomY = labelBottomY - (getLabelValueLabelGap() + getLabelNameFontSize());
+                const subTopY = labelBottomY + getLabelLabelSubGap();
+                nameText.setAttribute("x", rightX.toFixed(1));
+                nameText.setAttribute("y", labelBottomY.toFixed(1));
+                valueText.setAttribute("x", rightX.toFixed(1));
+                valueText.setAttribute("y", valueBottomY.toFixed(1));
+                subText.setAttribute("x", rightX.toFixed(1));
+                subText.setAttribute("y", subTopY.toFixed(1));
+            }
+
+            overlay.appendChild(valueText);
+            overlay.appendChild(nameText);
+            overlay.appendChild(subText);
+        }
+
+        function renderDrawingPoints() {
+            const svgNS = "http://www.w3.org/2000/svg";
+            
+            // Draw preview line from last point to mouse position in Line mode
+            if (drawMode === 'L' && currentPoints.length > 0 && mousePos) {
+                const lastPoint = currentPoints[currentPoints.length - 1];
+                const previewLine = document.createElementNS(svgNS, "line");
+                previewLine.setAttribute("x1", (lastPoint.x * scaleFactor).toFixed(1));
+                previewLine.setAttribute("y1", (lastPoint.y * scaleFactor).toFixed(1));
+                previewLine.setAttribute("x2", (mousePos.x * scaleFactor).toFixed(1));
+                previewLine.setAttribute("y2", (mousePos.y * scaleFactor).toFixed(1));
+                previewLine.setAttribute("stroke", "#ffd700");
+                previewLine.setAttribute("stroke-width", (getStrokeWidth() * 0.8).toFixed(1));
+                previewLine.setAttribute("stroke-opacity", "0.5");
+                previewLine.setAttribute("stroke-dasharray", "8,4");
+                overlay.appendChild(previewLine);
+                
+                // Draw preview point at mouse position
+                const previewCircle = document.createElementNS(svgNS, "circle");
+                previewCircle.setAttribute("cx", (mousePos.x * scaleFactor).toFixed(1));
+                previewCircle.setAttribute("cy", (mousePos.y * scaleFactor).toFixed(1));
+                previewCircle.setAttribute("r", (4 * scaleFactor).toFixed(1));
+                previewCircle.setAttribute("fill", "none");
+                previewCircle.setAttribute("stroke", "#ffd700");
+                previewCircle.setAttribute("stroke-width", "2");
+                previewCircle.setAttribute("stroke-opacity", "0.7");
+                overlay.appendChild(previewCircle);
+            }
+            
+            currentPoints.forEach((point, index) => {
+                const circle = document.createElementNS(svgNS, "circle");
+                circle.setAttribute("cx", (point.x * scaleFactor).toFixed(1));
+                circle.setAttribute("cy", (point.y * scaleFactor).toFixed(1));
+                circle.setAttribute("r", (5 * scaleFactor).toFixed(1));
+                
+                // First point (start) is green, last point is red, others are yellow
+                if (index === 0) {
+                    circle.setAttribute("fill", "#22c55e"); // green - start
+                } else if (index === currentPoints.length - 1) {
+                    circle.setAttribute("fill", "#ef4444"); // red - current end
+                } else {
+                    circle.setAttribute("fill", "#ffd700"); // yellow - intermediate
+                }
+                circle.setAttribute("stroke", "#fff");
+                circle.setAttribute("stroke-width", "1");
+                overlay.appendChild(circle);
+            });
+        }
+
+        // Drawing mode
+        function startDrawing(pathName, isLabel) {
+            // Deactivate previous
+            document.querySelectorAll('.path-entry').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+
+            if (currentDrawingPath === pathName) {
+                // Toggle off
+                stopDrawing();
+            } else {
+                // Activate
+                currentDrawingPath = pathName;
+                currentPoints = [];
+                mousePos = null;
+                // Reset to Move mode for fresh drawing (first click will be M, then auto-switch to L)
+                drawMode = 'M';
+                moveBtn.classList.add('active');
+                lineBtn.classList.remove('active');
+                document.getElementById(`entry-${pathName}`).classList.add('active');
+                document.querySelector(`.draw-btn[data-path="${pathName}"]`).classList.add('active');
+                modeIndicator.textContent = `Drawing: ${pathName}`;
+                overlay.classList.add('interactive');
+                endBtn.style.display = 'inline-block';
+            }
+            
+            renderAllPaths();
+        }
+        
+        function stopDrawing() {
+            if (currentDrawingPath) {
+                document.querySelectorAll('.path-entry').forEach(e => e.classList.remove('active'));
+                document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+            }
+            currentDrawingPath = null;
+            currentPoints = [];
+            mousePos = null;
+            modeIndicator.textContent = "Click a path's \"Draw\" button to start";
+            overlay.classList.remove('interactive');
+            endBtn.style.display = 'none';
+            renderAllPaths();
+        }
+
+        function clearPath(pathName) {
+            const input = document.getElementById(`path-${pathName}`);
+            if (input) {
+                input.value = '';
+                
+                // If clearing the currently active drawing path, reset drawing state
+                if (currentDrawingPath === pathName) {
+                    currentPoints = [];
+                    // Reset to Move mode for fresh drawing
+                    drawMode = 'M';
+                    moveBtn.classList.add('active');
+                    lineBtn.classList.remove('active');
+                }
+                
+                renderAllPaths();
+            }
+        }
+
+        // Snap point to 0°, 90°, 180°, 270° relative to last point
+        function snapToCardinal(lastPoint, x, y) {
+            const dx = x - lastPoint.x;
+            const dy = y - lastPoint.y;
+            const angle = Math.atan2(dy, dx);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Snap to nearest cardinal direction (0°, 90°, 180°, 270°)
+            // In radians: 0, π/2, π, -π/2 (or 3π/2)
+            const snappedAngle = Math.round(angle / (Math.PI / 2)) * (Math.PI / 2);
+            
+            return {
+                x: Math.round(lastPoint.x + distance * Math.cos(snappedAngle)),
+                y: Math.round(lastPoint.y + distance * Math.sin(snappedAngle))
+            };
+        }
+
+        // Canvas click handler
+        canvasContainer.addEventListener('click', (e) => {
+            if (!currentDrawingPath || !imageLoaded) return;
+
+            const rect = baseImage.getBoundingClientRect();
+            const scaleX = baseImage.naturalWidth / rect.width;
+            const scaleY = baseImage.naturalHeight / rect.height;
+            
+            // Get click position in original (unscaled) coordinates
+            const rawX = (e.clientX - rect.left) * scaleX / scaleFactor;
+            const rawY = (e.clientY - rect.top) * scaleY / scaleFactor;
+            let x = Math.round(rawX);
+            let y = Math.round(rawY);
+            
+            // Snap to cardinal directions if Shift is held in Line mode
+            if (e.shiftKey && drawMode === 'L' && currentPoints.length > 0) {
+                const lastPoint = currentPoints[currentPoints.length - 1];
+                const snapped = snapToCardinal(lastPoint, x, y);
+                x = snapped.x;
+                y = snapped.y;
+            }
+
+            currentPoints.push({ x, y });
+
+            // Build path string
+            const input = document.getElementById(`path-${currentDrawingPath}`);
+            if (currentPoints.length === 1) {
+                // First point is always Move
+                input.value = `M ${x} ${y}`;
+                // Auto-switch to Line mode after first point
+                drawMode = 'L';
+                lineBtn.classList.add('active');
+                moveBtn.classList.remove('active');
+            } else {
+                input.value += ` ${drawMode} ${x} ${y}`;
+            }
+
+            renderAllPaths();
+        });
+
+        // Mouse move for coordinates and line preview
+        canvasContainer.addEventListener('mousemove', (e) => {
+            if (!imageLoaded) return;
+            
+            const rect = baseImage.getBoundingClientRect();
+            const scaleX = baseImage.naturalWidth / rect.width;
+            const scaleY = baseImage.naturalHeight / rect.height;
+            
+            let x = Math.round((e.clientX - rect.left) * scaleX / scaleFactor);
+            let y = Math.round((e.clientY - rect.top) * scaleY / scaleFactor);
+            
+            // Update mouse position for line preview
+            if (currentDrawingPath && drawMode === 'L' && currentPoints.length > 0) {
+                // Snap to cardinal directions if Shift is held
+                if (e.shiftKey) {
+                    const lastPoint = currentPoints[currentPoints.length - 1];
+                    const snapped = snapToCardinal(lastPoint, x, y);
+                    x = snapped.x;
+                    y = snapped.y;
+                }
+                mousePos = { x, y };
+                renderAllPaths();
+            }
+            
+            coordinatesDiv.textContent = `X: ${x}, Y: ${y}`;
+        });
+        
+        // Clear preview when mouse leaves canvas
+        canvasContainer.addEventListener('mouseleave', () => {
+            if (mousePos) {
+                mousePos = null;
+                renderAllPaths();
+            }
+        });
+
+        // Mode buttons
+        moveBtn.addEventListener('click', () => {
+            drawMode = 'M';
+            moveBtn.classList.add('active');
+            lineBtn.classList.remove('active');
+        });
+
+        lineBtn.addEventListener('click', () => {
+            drawMode = 'L';
+            lineBtn.classList.add('active');
+            moveBtn.classList.remove('active');
+        });
+        
+        // End button
+        endBtn.addEventListener('click', () => {
+            stopDrawing();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ignore if typing in input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            if (e.key === 'm' || e.key === 'M') {
+                moveBtn.click();
+            } else if (e.key === 'l' || e.key === 'L') {
+                lineBtn.click();
+            } else if (e.key === 'Escape') {
+                // Stop drawing
+                stopDrawing();
+            }
+        });
+
+        // Export for Node-RED node configuration (JSON format)
+        exportBtn.addEventListener('click', () => {
+            // Build energyPaths object
+            const energyPaths = {};
+            
+            // Group inverterToHome paths into array if multiple exist
+            const homePaths = [];
+            for (const name of Object.keys(routePathDefs)) {
+                const input = document.getElementById(`path-${name}`);
+                if (input && input.value.trim()) {
+                    if (name.startsWith('inverterToHome')) {
+                        homePaths.push(input.value.trim());
+                    } else {
+                        energyPaths[name] = input.value.trim();
+                    }
+                }
+            }
+            
+            // Add home paths - as array if multiple, single string if one
+            if (homePaths.length === 1) {
+                energyPaths.inverterToHome = homePaths[0];
+            } else if (homePaths.length > 1) {
+                energyPaths.inverterToHome = homePaths;
+            }
+
+            // Build labels object
+            const labels = {};
+            for (const name of Object.keys(labelPathDefs)) {
+                const input = document.getElementById(`path-${name}`);
+                const alignSelect = document.getElementById(`align-${name}`);
+                if (input && input.value.trim()) {
+                    const align = alignSelect ? alignSelect.value : labelPathDefs[name].align;
+                    labels[name] = {
+                        position: input.value.trim(),
+                        align: align
+                    };
+                }
+            }
+
+            const exportObj = {
+                energyPaths: energyPaths,
+                labels: labels
+            };
+
+            const output = JSON.stringify(exportObj, null, 2);
+            exportArea.value = output;
+
+            navigator.clipboard.writeText(output).then(() => {
+                const originalText = exportBtn.textContent;
+                exportBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    exportBtn.textContent = originalText;
+                }, 1500);
+            });
+        });
+
+        // Load from JSON modal
+        const loadJsonBtn = document.getElementById('loadJsonBtn');
+        const loadJsonModal = document.getElementById('loadJsonModal');
+        const loadJsonInput = document.getElementById('loadJsonInput');
+        const modalCancelBtn = document.getElementById('modalCancelBtn');
+        const modalLoadBtn = document.getElementById('modalLoadBtn');
+
+        loadJsonBtn.addEventListener('click', () => {
+            loadJsonInput.value = '';
+            loadJsonModal.style.display = 'flex';
+            loadJsonInput.focus();
+        });
+
+        modalCancelBtn.addEventListener('click', () => {
+            loadJsonModal.style.display = 'none';
+        });
+
+        // Close modal on overlay click
+        loadJsonModal.addEventListener('click', (e) => {
+            if (e.target === loadJsonModal) {
+                loadJsonModal.style.display = 'none';
+            }
+        });
+
+        // Close modal on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && loadJsonModal.style.display === 'flex') {
+                loadJsonModal.style.display = 'none';
+            }
+        });
+
+        modalLoadBtn.addEventListener('click', () => {
+            const input = loadJsonInput.value.trim();
+            if (!input) {
+                alert('Please paste JSON data');
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(input);
+
+                if (!parsed.energyPaths && !parsed.labels) {
+                    alert('Invalid JSON format. Expected { energyPaths: {...}, labels: {...} }');
+                    return;
+                }
+
+                // Load energyPaths
+                if (parsed.energyPaths) {
+                    for (const [name, value] of Object.entries(parsed.energyPaths)) {
+                        if (name === 'inverterToHome') {
+                            // Handle array or single path for inverterToHome
+                            const paths = Array.isArray(value) ? value : [value];
+                            paths.forEach((path, index) => {
+                                const inputId = index === 0 ? 'path-inverterToHome1' : `path-inverterToHome${index + 1}`;
+                                const pathInput = document.getElementById(inputId);
+                                if (pathInput) {
+                                    pathInput.value = path;
+                                }
+                            });
+                        } else {
+                            const pathInput = document.getElementById(`path-${name}`);
+                            if (pathInput) {
+                                pathInput.value = value;
+                            }
+                        }
+                    }
+                }
+
+                // Load labels
+                if (parsed.labels) {
+                    for (const [name, labelData] of Object.entries(parsed.labels)) {
+                        const pathInput = document.getElementById(`path-${name}`);
+                        if (pathInput && labelData.position) {
+                            pathInput.value = labelData.position;
+                        }
+
+                        const alignSelect = document.getElementById(`align-${name}`);
+                        if (alignSelect && labelData.align) {
+                            alignSelect.value = labelData.align;
+                        }
+                    }
+                }
+
+                loadJsonModal.style.display = 'none';
+                renderAllPaths();
+                
+            } catch (e) {
+                alert('Error parsing JSON: ' + e.message);
+            }
+        });
+
+        // Initialize
+        initUI();
+    </script>
+</body>
+
+</html>
