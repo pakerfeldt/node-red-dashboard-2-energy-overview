@@ -1,0 +1,232 @@
+<script type="text/javascript">
+    RED.nodes.registerType('ui-energy-overview', {
+        category: RED._('@flowfuse/node-red-dashboard/ui-base:ui-base.label.category'),
+        color: RED._('@flowfuse/node-red-dashboard/ui-base:ui-base.colors.light'),
+        defaults: {
+            name: { value: "" },
+            group: { type: 'ui-group', required: true },
+            order: { value: 0 },
+            width: {
+                value: 6,
+                validate: function (v) {
+                    const width = v || 0
+                    const currentGroup = $('#node-input-group').val() || this.group
+                    const groupNode = RED.nodes.node(currentGroup)
+                    const valid = !groupNode || +width <= +groupNode.width
+                    $('#node-input-size').toggleClass('input-error', !valid)
+                    return valid
+                }
+            },
+            height: { value: 6 },
+            pulseColor: { value: "#4dcbbf" },
+            image: { value: "" },
+            customPaths: { 
+                value: "",
+                validate: function(v) {
+                    if (!v || v.trim() === "") return true
+                    try {
+                        const parsed = JSON.parse(v)
+                        return parsed.energyPaths && parsed.labels
+                    } catch (e) {
+                        return false
+                    }
+                }
+            },
+            animationSpeed: { value: 150 },
+            trailLength: { value: 120 },
+            trailSpacing: { value: 4 },
+            fadeTime: { value: 1600 },
+            strokeWidth: { value: 3.2 },
+            labelFontSizes: { 
+                value: JSON.stringify({ 
+                    value: 42, 
+                    name: 32, 
+                    sub: 32 
+                })
+            },
+            labelSpacing: { 
+                value: JSON.stringify({ 
+                    textOffset: 16, 
+                    valueLabelGap: 8, 
+                    labelSubGap: 10 
+                })
+            }
+        },
+        inputs: 1,
+        outputs: 1,
+        icon: "font-awesome/fa-bolt",
+        paletteLabel: "energy overview",
+        label: function() {
+            return this.name || "energy overview";
+        },
+        oneditprepare: function () {
+            $('#node-input-size').elementSizer({
+                width: '#node-input-width',
+                height: '#node-input-height',
+                group: '#node-input-group'
+            });
+
+            const $customPaths = $('#node-input-customPaths');
+            const $validationStatus = $('#custom-paths-validation');
+            
+            function validateCustomPaths() {
+                const value = $customPaths.val().trim();
+                if (!value) {
+                    $validationStatus.html('<span style="color: #888;">Using default paths</span>');
+                    $customPaths.removeClass('input-error');
+                    return;
+                }
+                try {
+                    const parsed = JSON.parse(value);
+                    if (parsed.energyPaths && parsed.labels) {
+                        const pathCount = Object.keys(parsed.energyPaths).length;
+                        const labelCount = Object.keys(parsed.labels).length;
+                        $validationStatus.html('<span style="color: #5a5;">Valid JSON: ' + pathCount + ' energy paths, ' + labelCount + ' labels</span>');
+                        $customPaths.removeClass('input-error');
+                    } else {
+                        $validationStatus.html('<span style="color: #d55;">Missing required fields: energyPaths and/or labels</span>');
+                        $customPaths.addClass('input-error');
+                    }
+                } catch (e) {
+                    $validationStatus.html('<span style="color: #d55;">Invalid JSON: ' + e.message + '</span>');
+                    $customPaths.addClass('input-error');
+                }
+            }
+            
+            $customPaths.on('input', validateCustomPaths);
+            validateCustomPaths();
+        }
+    });
+</script>
+
+<script type="text/html" data-template-name="ui-energy-overview">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-input-name" placeholder="Name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-group"><i class="fa fa-table"></i> Group</label>
+        <input type="text" id="node-input-group">
+    </div>
+    <div class="form-row">
+        <label><i class="fa fa-object-group"></i> Size</label>
+        <input type="hidden" id="node-input-width">
+        <input type="hidden" id="node-input-height">
+        <button class="editor-button" id="node-input-size"></button>
+    </div>
+    <div class="form-row">
+        <label for="node-input-pulseColor"><i class="fa fa-paint-brush"></i> Pulse Color</label>
+        <input type="color" id="node-input-pulseColor" style="width: 100px;">
+    </div>
+    <div class="form-row">
+        <label for="node-input-image"><i class="fa fa-image"></i> Image URL</label>
+        <input type="text" id="node-input-image" placeholder="Leave empty for default image">
+    </div>
+    <div class="form-row">
+        <label for="node-input-customPaths"><i class="fa fa-code"></i> Custom Paths</label>
+        <textarea id="node-input-customPaths" rows="8" style="width: 70%; font-family: monospace; font-size: 12px;" placeholder="Paste JSON from path tracer tool here (leave empty for default paths)"></textarea>
+        <div id="custom-paths-validation" style="margin-top: 4px; font-size: 11px;"></div>
+        <div class="form-tips" style="margin-top: 8px;">
+            <b>Tip:</b> Use the <a href="https://github.com/pakerfeldt/node-red-dashboard-2-energy-overview/blob/main/energy-path-tracer.html" target="_blank">Path Tracer Tool</a> 
+            to generate custom path configurations for your own house image.
+        </div>
+    </div>
+    
+    <!-- Animation Settings -->
+    <div class="form-row">
+        <h4>Animation Settings</h4>
+    </div>
+    <div class="form-row">
+        <label for="node-input-animationSpeed"><i class="fa fa-tachometer"></i> Speed (px/sec)</label>
+        <input type="number" id="node-input-animationSpeed" style="width: 100px;" min="50" max="500" step="10">
+    </div>
+    <div class="form-row">
+        <label for="node-input-trailLength"><i class="fa fa-arrows-h"></i> Trail Length (px)</label>
+        <input type="number" id="node-input-trailLength" style="width: 100px;" min="50" max="300" step="10">
+    </div>
+    <div class="form-row">
+        <label for="node-input-trailSpacing"><i class="fa fa-circle-o"></i> Trail Spacing (px)</label>
+        <input type="number" id="node-input-trailSpacing" style="width: 100px;" min="1" max="20" step="1">
+    </div>
+    <div class="form-row">
+        <label for="node-input-fadeTime"><i class="fa fa-clock-o"></i> Fade Time (ms)</label>
+        <input type="number" id="node-input-fadeTime" style="width: 100px;" min="500" max="3000" step="100">
+    </div>
+    <div class="form-row">
+        <label for="node-input-strokeWidth"><i class="fa fa-paint-brush"></i> Stroke Width</label>
+        <input type="number" id="node-input-strokeWidth" style="width: 100px;" min="1" max="10" step="0.1">
+    </div>
+</script>
+
+<script type="text/html" data-help-name="ui-energy-overview">
+    <p>An energy flow visualization widget for Node-RED Dashboard 2.0.</p>
+    
+    <h3>Inputs</h3>
+    <p>The node accepts messages with the following properties to control energy flow animations and labels:</p>
+    
+    <h4>Route Controls (boolean)</h4>
+    <ul>
+        <li><code>msg.solarToInverter</code> - Enable/disable solar to inverter flow</li>
+        <li><code>msg.inverterToHome</code> - Enable/disable inverter to home flow</li>
+        <li><code>msg.inverterToGrid</code> - Enable/disable inverter to grid flow (export)</li>
+        <li><code>msg.gridToInverter</code> - Enable/disable grid to inverter flow (import)</li>
+        <li><code>msg.inverterToBattery</code> - Enable/disable inverter to battery flow (charging)</li>
+        <li><code>msg.batteryToInverter</code> - Enable/disable battery to inverter flow (discharging)</li>
+        <li><code>msg.inverterToCar</code> - Enable/disable inverter to car flow (EV charging)</li>
+        <li><code>msg.carToInverter</code> - Enable/disable car to inverter flow (V2H/V2G)</li>
+    </ul>
+    
+    <h4>Labels</h4>
+    <p>Use <code>msg.labels</code> object to set values and sublabels:</p>
+    <pre>
+msg.labels = {
+    solar: { value: "3.2 kW", sublabel: "Producing" },
+    home: { value: "1.5 kW", sublabel: "Consuming" },
+    grid: { value: "0.8 kW", sublabel: "Exporting" },
+    battery: { value: "85%", sublabel: "Charging" },
+    car: { value: "7.4 kW", sublabel: "Charging" }
+}
+    </pre>
+    
+    <h4>Dynamic Properties</h4>
+    <p>Use <code>msg.ui_update</code> to dynamically update widget configuration:</p>
+    <ul>
+        <li><code>msg.ui_update.pulseColor</code> - Change the pulse animation color</li>
+        <li><code>msg.ui_update.image</code> - Change the background image URL</li>
+    </ul>
+    
+    <h3>Custom Paths</h3>
+    <p>When using a custom house image, you can define custom energy flow paths and label positions using JSON configuration.</p>
+    <p>Use the Path Tracer Tool to generate the configuration, then paste the JSON into the "Custom Paths" field.</p>
+    <p>Expected JSON format:</p>
+    <pre>
+{
+  "energyPaths": {
+    "solarToInverter": "M 427 295 L 484 332 L 484 533",
+    "inverterToHome": ["M 513 532 L 513 445 L 808 451", "M 513 532 L 966 455"],
+    "inverterToGrid": "M 451 631 L 401 631 L 403 821",
+    "inverterToBattery": "M 499 649 L 499 748 L 594 742",
+    "inverterToCar": "M 451 604 L 389 608 L 253 654"
+  },
+  "labels": {
+    "solar": { "position": "M 608 41 L 608 300", "align": "top" },
+    "home": { "position": "M 776 41 L 776 445", "align": "top" },
+    "grid": { "position": "M 448 850 L 448 921", "align": "bottom" },
+    "battery": { "position": "M 643 772 L 643 921", "align": "bottom" },
+    "car": { "position": "M 103 820 L 103 921", "align": "bottom" }
+  }
+}
+    </pre>
+    
+    <h3>Example Flow</h3>
+    <pre>
+// Enable solar production flowing to home
+msg.solarToInverter = true;
+msg.inverterToHome = true;
+msg.labels = {
+    solar: { value: "5.2 kW" },
+    home: { value: "2.1 kW" }
+};
+return msg;
+    </pre>
+</script>
