@@ -1,0 +1,75 @@
+{
+    "name": "node-red-dashboard-2-energy-overview",
+    "version": "1.0.0",
+    "description": "An energy overview widget for Node-RED Dashboard 2.0 that visualizes energy flow between solar, grid, battery, home, and EV",
+    "keywords": [
+        "node-red",
+        "node-red-dashboard-2",
+        "energy",
+        "solar",
+        "battery",
+        "power-flow"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/your-username/node-red-dashboard-2-energy-overview.git"
+    },
+    "license": "Apache-2.0",
+    "author": {
+        "name": "Patrik Åkerfeldt",
+        "url": "https://github.com/pakerfeldt/node-red-dashboard-2-energy-overview"
+    },
+    "main": "./resources/ui-energy-overview.umd.js",
+    "files": [
+        "nodes/*",
+        "ui/*",
+        "resources/*",
+        "examples/*"
+    ],
+    "scripts": {
+        "build": "vite build",
+        "build:dev": "NODE_ENV=development vite build",
+        "dev": "NODE_ENV=development vite build --watch",
+        "dev:prod": "vite build --watch",
+        "lint": "npm run lint:js",
+        "lint:fix": "npm run lint:js:fix",
+        "lint:js": "eslint --ext .js,.vue,.cjs,.mjs .",
+        "lint:js:fix": "yarn lint:js --fix",
+        "prepublishOnly": "npm run build"
+    },
+    "dependencies": {},
+    "peerDependencies": {
+        "@flowfuse/node-red-dashboard": ">=1.29.0"
+    },
+    "devDependencies": {
+        "vue": "^3.3.8",
+        "vuex": "^4.1.0",
+        "@vitejs/plugin-vue": "^4.5.0",
+        "eslint": "^8.53.0",
+        "eslint-config-standard": "^17.1.0",
+        "eslint-plugin-import": "^2.29.0",
+        "eslint-plugin-n": "^16.3.1",
+        "eslint-plugin-vue": "^9.18.1",
+        "vite": "^5.0.13",
+        "vite-plugin-css-injected-by-js": "^3.3.0",
+        "vite-plugin-static-copy": "^1.0.6"
+    },
+    "engines": {
+        "node": ">=14"
+    },
+    "node-red": {
+        "version": ">=3.0.0",
+        "nodes": {
+            "ui-energy-overview": "nodes/ui-energy-overview.js"
+        }
+    },
+    "node-red-dashboard-2": {
+        "version": "1.22.0",
+        "widgets": {
+            "ui-energy-overview": {
+                "output": "ui-energy-overview.umd.js",
+                "component": "UIEnergyOverview"
+            }
+        }
+    }
+}
