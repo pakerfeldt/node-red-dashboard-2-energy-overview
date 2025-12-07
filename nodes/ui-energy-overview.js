@@ -65,6 +65,17 @@ module.exports = function (RED) {
         const evts = {
             onAction: true,
             beforeSend: function (msg) {
+                // Deep merge labels: preserve existing labels not in the new message,
+                // but completely replace individual labels that are provided
+                if (msg.labels && typeof msg.labels === 'object') {
+                    const storedMsg = base.stores.data.get(node.id) || {}
+                    const existingLabels = storedMsg.labels || {}
+                    msg.labels = {
+                        ...existingLabels,
+                        ...msg.labels
+                    }
+                }
+
                 const updates = msg.ui_update
                 if (updates) {
                     // Validate and set pulseColor
