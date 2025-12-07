@@ -1,5 +1,5 @@
 {
-    "name": "node-red-dashboard-2-energy-overview",
+    "name": "@pakerfeldt/node-red-dashboard-2-energy-overview",
     "version": "1.0.0",
     "description": "An energy overview widget for Node-RED Dashboard 2.0 that visualizes energy flow between solar, grid, battery, home, and EV",
     "keywords": [
