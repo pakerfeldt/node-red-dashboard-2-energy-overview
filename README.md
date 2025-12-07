@@ -4,7 +4,8 @@ An energy flow visualization widget for Node-RED Dashboard 2.0 that displays rea
 
 ![Energy Overview Demo](energy-overview.gif)
 
-**Note:** This node comes with a default [low-quality image](resources/house.webp) built-in to keep the size of this node small. The [high-fidelity version](house.png) is available as a drop-in replacement where all paths can remain the same. To use the high-fidelity version, copy [house.png](house.png) to your [Node-RED static folder](https://nodered.org/docs/user-guide/runtime/configuration) and reference it in the widget configuration (e.g. `/house.png`).
+> [!NOTE]
+> This node comes with a default [low-quality image](resources/house.webp) built-in to keep the size of this node small. The [high-fidelity version](house.png) is available as a drop-in replacement where all paths can remain the same. To use the high-fidelity version, copy [house.png](house.png) to your [Node-RED static folder](https://nodered.org/docs/user-guide/runtime/configuration) and reference it in the widget configuration (e.g. `/house.png`).
 
 ## Features
 
