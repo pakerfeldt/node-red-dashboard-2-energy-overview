@@ -4,6 +4,8 @@ An energy flow visualization widget for Node-RED Dashboard 2.0 that displays rea
 
 ![Energy Overview Demo](energy-overview.gif)
 
+**Note:** This node comes with a default [low-quality image](resources/house.webp) built-in to keep the size of this node small. The [high-fidelity version](house.png) is available as a drop-in replacement where all paths can remain the same. To use the high-fidelity version, copy [house.png](house.png) to your [Node-RED static folder](https://nodered.org/docs/user-guide/runtime/configuration) and reference it in the widget configuration (e.g. `/house.png`).
+
 ## Features
 
 - Animated pulse visualization showing energy flow direction
@@ -121,8 +123,6 @@ return msg;
 ## Custom House Image
 
 You can use your own house image. The widget expects the image to have approximately the same layout as the default image (1056x992 pixels reference size). The widget will scale paths automatically based on the actual image dimensions.
-
-**Note:** The node includes a default image (`house.webp`), but to save on module size, it's just a simple, low-quality image. A high-fidelity version (`house.png`) is available as a drop-in replacement where all paths can remain the same. To use the high-quality version, copy `house.png` to your Node-RED static folder and reference it in the widget configuration.
 
 To create custom paths for your image, you can use the included `energy-path-tracer.html` tool, or access it online at:
 **https://pakerfeldt.github.io/node-red-dashboard-2-energy-overview/energy-path-tracer.html**
