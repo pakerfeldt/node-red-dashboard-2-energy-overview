@@ -154,7 +154,27 @@ You can generate custom house images for your energy overview widget using Gemin
 Here's an example prompt that was used to generate the default house image:
 
 ```
-A minimalist, hyper-detailed 3D render of a smart energy system, in isometric view. The scene features a modern, low-angled roof, dark gray building in horizontal wooden panel, with 8 sleek solar panels with black glass look with slight reflection. The camera angle should prioritize the front facade as the primary visible surface. Only the front facing wall is visible and it features a white, wall-mounted inverter to the left, and without any window between, a wall-mounted, large battery on the right. The house also features a few large windows with black frames, mild reflection in the windows. On the left side of the house stands a neutral, modern, dark gray electric vehicle (EV) without car logo visible that doesn't look exactly like a Tesla. Only the front of the car is visible as the car enters the image from the left. Its head lights are off. Close to the car is a neutral, dark car charger on the wall that blends in with the house. Low-key, moody studio lighting with a dark, indistinct background. Clean lines, monochromatic color scheme (dark grays and blacks), product visualization style, cinematic. The camera focuses on the car, inverter, battery and solar panels. The camera is positioned such that it leaves roughly 1/7th of the vertical space at the top and bottom free from the house without hard cropping or cutting the house.
+A minimalist, hyper-detailed 3D render of a smart energy system, in isometric view. 
+The scene features a modern, low-angled roof, dark gray building in horizontal wooden 
+panel, with 8 sleek solar panels with black glass look with slight reflection. 
+
+The camera angle should prioritize the front facade as the primary visible surface. 
+Only the front facing wall is visible and it features a white, wall-mounted inverter 
+to the left, and without any window between, a wall-mounted, large battery on the right. 
+
+The house also features a few large windows with black frames, mild reflection in the 
+windows. On the left side of the house stands a neutral, modern, dark gray electric 
+vehicle (EV) without car logo visible that doesn't look exactly like a Tesla. Only 
+the front of the car is visible as the car enters the image from the left. Its head 
+lights are off. 
+
+Close to the car is a neutral, dark car charger on the wall that blends in with the 
+house. Low-key, moody studio lighting with a dark, indistinct background. Clean lines, 
+monochromatic color scheme (dark grays and blacks), product visualization style, 
+cinematic. The camera focuses on the car, inverter, battery and solar panels. 
+
+The camera is positioned such that it leaves roughly 1/7th of the vertical space at 
+the top and bottom free from the house without hard cropping or cutting the house.
 
 Size 2144 × 1984 pixels
 ```
