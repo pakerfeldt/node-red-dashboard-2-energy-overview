@@ -191,6 +191,3 @@ Size 2144 × 1984 pixels
 
 Apache-2.0
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
