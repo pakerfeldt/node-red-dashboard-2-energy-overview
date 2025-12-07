@@ -234,24 +234,40 @@
     <p>An energy flow visualization widget for Node-RED Dashboard 2.0.</p>
     
     <h3>Inputs</h3>
-    <p>The node accepts messages with the following properties to control energy flow animations and labels:</p>
+    <p>The node accepts <code>msg.payload</code> with the following structure:</p>
+    
+    <h4>Payload Structure</h4>
+    <pre>
+msg.payload = {
+    routes: {
+        solarToInverter: true,
+        inverterToHome: true,
+        gridToInverter: false
+    },
+    labels: {
+        solar: { value: "3.2 kW", sublabel: "Producing" },
+        home: { value: "1.5 kW", sublabel: "Consuming" }
+    }
+}
+    </pre>
     
     <h4>Route Controls (boolean)</h4>
+    <p>Set <code>msg.payload.routes</code> to control energy flow animations:</p>
     <ul>
-        <li><code>msg.solarToInverter</code> - Enable/disable solar to inverter flow</li>
-        <li><code>msg.inverterToHome</code> - Enable/disable inverter to home flow</li>
-        <li><code>msg.inverterToGrid</code> - Enable/disable inverter to grid flow (export)</li>
-        <li><code>msg.gridToInverter</code> - Enable/disable grid to inverter flow (import)</li>
-        <li><code>msg.inverterToBattery</code> - Enable/disable inverter to battery flow (charging)</li>
-        <li><code>msg.batteryToInverter</code> - Enable/disable battery to inverter flow (discharging)</li>
-        <li><code>msg.inverterToCar</code> - Enable/disable inverter to car flow (EV charging)</li>
-        <li><code>msg.carToInverter</code> - Enable/disable car to inverter flow (V2H/V2G)</li>
+        <li><code>solarToInverter</code> - Enable/disable solar to inverter flow</li>
+        <li><code>inverterToHome</code> - Enable/disable inverter to home flow</li>
+        <li><code>inverterToGrid</code> - Enable/disable inverter to grid flow (export)</li>
+        <li><code>gridToInverter</code> - Enable/disable grid to inverter flow (import)</li>
+        <li><code>inverterToBattery</code> - Enable/disable inverter to battery flow (charging)</li>
+        <li><code>batteryToInverter</code> - Enable/disable battery to inverter flow (discharging)</li>
+        <li><code>inverterToCar</code> - Enable/disable inverter to car flow (EV charging)</li>
+        <li><code>carToInverter</code> - Enable/disable car to inverter flow (V2H/V2G)</li>
     </ul>
     
     <h4>Labels</h4>
-    <p>Use <code>msg.labels</code> object to set values and sublabels:</p>
+    <p>Set <code>msg.payload.labels</code> to update values and sublabels:</p>
     <pre>
-msg.labels = {
+msg.payload.labels = {
     solar: { value: "3.2 kW", sublabel: "Producing" },
     home: { value: "1.5 kW", sublabel: "Consuming" },
     grid: { value: "0.8 kW", sublabel: "Exporting" },
@@ -259,6 +275,18 @@ msg.labels = {
     car: { value: "7.4 kW", sublabel: "Charging" }
 }
     </pre>
+    <p>Labels are merged with existing values, so you can update individual labels without resending all of them.</p>
+    
+    <h4>Reset State</h4>
+    <p>Use <code>msg.reset</code> to clear all stored routes and labels before applying new values:</p>
+    <pre>
+msg.reset = true;  // Any value works, just needs to be defined
+msg.payload = {
+    routes: { solarToInverter: true },
+    labels: { solar: { value: "5 kW" } }
+};
+    </pre>
+    <p>This clears the existing state first, then applies only the values in the current message. Without <code>msg.reset</code>, routes and labels are merged with existing state.</p>
     
     <h4>Dynamic Properties</h4>
     <p>Use <code>msg.ui_update</code> to dynamically update widget configuration:</p>
@@ -298,11 +326,15 @@ msg.labels = {
     <h3>Example Flow</h3>
     <pre>
 // Enable solar production flowing to home
-msg.solarToInverter = true;
-msg.inverterToHome = true;
-msg.labels = {
-    solar: { value: "5.2 kW" },
-    home: { value: "2.1 kW" }
+msg.payload = {
+    routes: {
+        solarToInverter: true,
+        inverterToHome: true
+    },
+    labels: {
+        solar: { value: "5.2 kW" },
+        home: { value: "2.1 kW" }
+    }
 };
 return msg;
     </pre>

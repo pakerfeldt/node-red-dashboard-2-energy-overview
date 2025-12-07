@@ -39,51 +39,47 @@ npm install node-red-dashboard-2-energy-overview
 
 ### Message Format
 
-#### Route Controls
-
-Enable or disable energy flow routes using boolean properties:
+The node accepts `msg.payload` with `routes` and `labels` properties:
 
 ```javascript
-msg.solarToInverter = true;    // Solar panels producing
-msg.inverterToHome = true;     // Power to home
-msg.inverterToGrid = true;     // Exporting to grid
-msg.gridToInverter = true;     // Importing from grid
-msg.inverterToBattery = true;  // Charging battery
-msg.batteryToInverter = true;  // Discharging battery
-msg.inverterToCar = true;      // Charging EV
-msg.carToInverter = true;      // V2H/V2G (vehicle to home/grid)
+msg.payload = {
+    routes: {
+        solarToInverter: true,    // Solar panels producing
+        inverterToHome: true,     // Power to home
+        inverterToGrid: true,     // Exporting to grid
+        gridToInverter: true,     // Importing from grid
+        inverterToBattery: true,  // Charging battery
+        batteryToInverter: true,  // Discharging battery
+        inverterToCar: true,      // Charging EV
+        carToInverter: true       // V2H/V2G (vehicle to home/grid)
+    },
+    labels: {
+        solar: { value: "5.2 kW", sublabel: "Producing" },
+        home: { value: "2.1 kW", sublabel: "Consuming" },
+        grid: { value: "1.8 kW", sublabel: "Exporting" },
+        battery: { value: "5.8 kW", sublabel: "Charging" },
+        car: { value: "7.4 kW", sublabel: "Charging" }
+    }
+};
 ```
 
 **Note:** Bidirectional routes (grid, battery, car) are mutually exclusive - enabling one direction automatically disables the opposite.
 
-#### Labels
+Labels are merged with existing values, so you can update individual labels without resending all of them.
 
-Update the display values and sublabels:
+### Reset State
+
+Use `msg.reset` to clear all stored routes and labels before applying new values:
 
 ```javascript
-msg.labels = {
-    solar: {
-        value: "5.2 kW",
-        sublabel: "Producing"
-    },
-    home: {
-        value: "2.1 kW",
-        sublabel: "Consuming"
-    },
-    grid: {
-        value: "1.8 kW",
-        sublabel: "Exporting"
-    },
-    battery: {
-        value: "5.8 kW",
-        sublabel: "Charging"
-    },
-    car: {
-        value: "7.4 kW",
-        sublabel: "Charging"
-    }
+msg.reset = true;  // Any value works, just needs to be defined
+msg.payload = {
+    routes: { solarToInverter: true },
+    labels: { solar: { value: "5 kW" } }
 };
 ```
+
+This clears the existing state first, then applies only the values in the current message. Without `msg.reset`, routes and labels are merged with existing state.
 
 ### Dynamic Properties
 
@@ -100,16 +96,18 @@ msg.ui_update = {
 
 ```javascript
 // Example function node to update energy overview
-msg.solarToInverter = true;
-msg.inverterToHome = true;
-msg.inverterToBattery = true;
-
-msg.labels = {
-    solar: { value: "4.8 kW", sublabel: "Peak production" },
-    home: { value: "1.2 kW", sublabel: "Low usage" },
-    battery: { value: "72%", sublabel: "+2.1 kW" }
+msg.payload = {
+    routes: {
+        solarToInverter: true,
+        inverterToHome: true,
+        inverterToBattery: true
+    },
+    labels: {
+        solar: { value: "4.8 kW", sublabel: "Peak production" },
+        home: { value: "1.2 kW", sublabel: "Low usage" },
+        battery: { value: "72%", sublabel: "+2.1 kW" }
+    }
 };
-
 return msg;
 ```
 
