@@ -32,11 +32,46 @@
                     }
                 }
             },
-            animationSpeed: { value: 150 },
-            trailLength: { value: 120 },
-            trailSpacing: { value: 4 },
-            fadeTime: { value: 1600 },
-            strokeWidth: { value: 3.2 },
+            animationSpeed: { 
+                value: 150,
+                validate: function(v) {
+                    if (v === '' || v === undefined || v === null) return true;
+                    const num = parseFloat(v);
+                    return !isNaN(num) && num >= 50 && num <= 500;
+                }
+            },
+            trailLength: { 
+                value: 120,
+                validate: function(v) {
+                    if (v === '' || v === undefined || v === null) return true;
+                    const num = parseFloat(v);
+                    return !isNaN(num) && num >= 50 && num <= 300;
+                }
+            },
+            trailSpacing: { 
+                value: 4,
+                validate: function(v) {
+                    if (v === '' || v === undefined || v === null) return true;
+                    const num = parseFloat(v);
+                    return !isNaN(num) && num >= 1 && num <= 20;
+                }
+            },
+            fadeTime: { 
+                value: 1600,
+                validate: function(v) {
+                    if (v === '' || v === undefined || v === null) return true;
+                    const num = parseFloat(v);
+                    return !isNaN(num) && num >= 500 && num <= 3000;
+                }
+            },
+            strokeWidth: { 
+                value: 3.2,
+                validate: function(v) {
+                    if (v === '' || v === undefined || v === null) return true;
+                    const num = parseFloat(v);
+                    return !isNaN(num) && num >= 1 && num <= 10;
+                }
+            },
             labelFontSizes: { 
                 value: JSON.stringify({ 
                     value: 42, 
@@ -95,6 +130,39 @@
             
             $customPaths.on('input', validateCustomPaths);
             validateCustomPaths();
+
+            // Animation settings toggle
+            $('#animation-settings-toggle').on('click', function(e) {
+                e.preventDefault();
+                const $container = $('#animation-settings-container');
+                const $caret = $('#animation-settings-caret');
+                $container.slideToggle(200);
+                $caret.toggleClass('fa-caret-right fa-caret-down');
+            });
+
+            // Animation settings validation with visual feedback
+            const animationFields = [
+                { id: 'node-input-animationSpeed', min: 50, max: 500, defaultValue: 150 },
+                { id: 'node-input-trailLength', min: 50, max: 300, defaultValue: 120 },
+                { id: 'node-input-trailSpacing', min: 1, max: 20, defaultValue: 4 },
+                { id: 'node-input-fadeTime', min: 500, max: 3000, defaultValue: 1600 },
+                { id: 'node-input-strokeWidth', min: 1, max: 10, defaultValue: 3.2 }
+            ];
+
+            animationFields.forEach(function(field) {
+                const $input = $('#' + field.id);
+                // Initialize with default value if empty
+                if ($input.val() === '' || $input.val() === undefined) {
+                    $input.val(field.defaultValue);
+                }
+                $input.on('input change', function() {
+                    const val = parseFloat($input.val());
+                    const valid = !isNaN(val) && val >= field.min && val <= field.max;
+                    $input.toggleClass('input-error', !valid);
+                });
+                // Trigger initial validation
+                $input.trigger('change');
+            });
         }
     });
 </script>
@@ -127,34 +195,38 @@
         <textarea id="node-input-customPaths" rows="8" style="width: 70%; font-family: monospace; font-size: 12px;" placeholder="Paste JSON from path tracer tool here (leave empty for default paths)"></textarea>
         <div id="custom-paths-validation" style="margin-top: 4px; font-size: 11px;"></div>
         <div class="form-tips" style="margin-top: 8px;">
-            <b>Tip:</b> Use the <a href="https://github.com/pakerfeldt/node-red-dashboard-2-energy-overview/blob/main/energy-path-tracer.html" target="_blank">Path Tracer Tool</a> 
+            <b>Tip:</b> Use the <a href="https://pakerfeldt.github.io/node-red-dashboard-2-energy-overview/energy-path-tracer.html" target="_blank">Path Tracer Tool</a> 
             to generate custom path configurations for your own house image.
         </div>
     </div>
     
-    <!-- Animation Settings -->
+    <!-- Animation Settings (collapsible) -->
     <div class="form-row">
-        <h4>Animation Settings</h4>
+        <a href="#" id="animation-settings-toggle" style="text-decoration: none;">
+            <i class="fa fa-caret-right" id="animation-settings-caret"></i> <span>Animation Settings</span>
+        </a>
     </div>
-    <div class="form-row">
-        <label for="node-input-animationSpeed"><i class="fa fa-tachometer"></i> Speed (px/sec)</label>
-        <input type="number" id="node-input-animationSpeed" style="width: 100px;" min="50" max="500" step="10">
-    </div>
-    <div class="form-row">
-        <label for="node-input-trailLength"><i class="fa fa-arrows-h"></i> Trail Length (px)</label>
-        <input type="number" id="node-input-trailLength" style="width: 100px;" min="50" max="300" step="10">
-    </div>
-    <div class="form-row">
-        <label for="node-input-trailSpacing"><i class="fa fa-circle-o"></i> Trail Spacing (px)</label>
-        <input type="number" id="node-input-trailSpacing" style="width: 100px;" min="1" max="20" step="1">
-    </div>
-    <div class="form-row">
-        <label for="node-input-fadeTime"><i class="fa fa-clock-o"></i> Fade Time (ms)</label>
-        <input type="number" id="node-input-fadeTime" style="width: 100px;" min="500" max="3000" step="100">
-    </div>
-    <div class="form-row">
-        <label for="node-input-strokeWidth"><i class="fa fa-paint-brush"></i> Stroke Width</label>
-        <input type="number" id="node-input-strokeWidth" style="width: 100px;" min="1" max="10" step="0.1">
+    <div id="animation-settings-container" style="display: none; margin-left: 20px;">
+        <div class="form-row">
+            <label for="node-input-animationSpeed"><i class="fa fa-tachometer"></i> Speed (px/sec)</label>
+            <input type="number" id="node-input-animationSpeed" style="width: 100px;" min="50" max="500" step="10">
+        </div>
+        <div class="form-row">
+            <label for="node-input-trailLength"><i class="fa fa-arrows-h"></i> Trail Length (px)</label>
+            <input type="number" id="node-input-trailLength" style="width: 100px;" min="50" max="300" step="10">
+        </div>
+        <div class="form-row">
+            <label for="node-input-trailSpacing"><i class="fa fa-circle-o"></i> Trail Spacing (px)</label>
+            <input type="number" id="node-input-trailSpacing" style="width: 100px;" min="1" max="20" step="1">
+        </div>
+        <div class="form-row">
+            <label for="node-input-fadeTime"><i class="fa fa-clock-o"></i> Fade Time (ms)</label>
+            <input type="number" id="node-input-fadeTime" style="width: 100px;" min="500" max="3000" step="100">
+        </div>
+        <div class="form-row">
+            <label for="node-input-strokeWidth"><i class="fa fa-paint-brush"></i> Stroke Width</label>
+            <input type="number" id="node-input-strokeWidth" style="width: 100px;" min="1" max="10" step="0.1">
+        </div>
     </div>
 </script>
 
@@ -193,11 +265,16 @@ msg.labels = {
     <ul>
         <li><code>msg.ui_update.pulseColor</code> - Change the pulse animation color</li>
         <li><code>msg.ui_update.image</code> - Change the background image URL</li>
+        <li><code>msg.ui_update.animationSpeed</code> - Change animation speed (px/sec, 50-500)</li>
+        <li><code>msg.ui_update.trailLength</code> - Change pulse trail length (px, 50-300)</li>
+        <li><code>msg.ui_update.trailSpacing</code> - Change spacing between trail dots (px, 1-20)</li>
+        <li><code>msg.ui_update.fadeTime</code> - Change fade out duration (ms, 500-3000)</li>
+        <li><code>msg.ui_update.strokeWidth</code> - Change pulse stroke width (1-10)</li>
     </ul>
     
     <h3>Custom Paths</h3>
-    <p>When using a custom house image, you can define custom energy flow paths and label positions using JSON configuration.</p>
-    <p>Use the Path Tracer Tool to generate the configuration, then paste the JSON into the "Custom Paths" field.</p>
+    <p>The default house image works out of the box, but if you want to use your own house image or floor plan, you'll need to create custom paths. Custom paths define where the energy flow animations and labels are positioned on your image.</p>
+    <p>Use the <a href="https://pakerfeldt.github.io/node-red-dashboard-2-energy-overview/energy-path-tracer.html" target="_blank">Path Tracer Tool</a> to visually draw paths on your custom image, then copy the generated JSON into the "Custom Paths" field.</p>
     <p>Expected JSON format:</p>
     <pre>
 {
