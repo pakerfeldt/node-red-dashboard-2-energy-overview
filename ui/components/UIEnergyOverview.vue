@@ -413,25 +413,27 @@ export default {
             this.animationFrameId = requestAnimationFrame(animate)
         },
         handleMessage (msg) {
+            const payload = msg.payload || {}
+            const routes = payload.routes || {}
+            const labels = payload.labels || {}
+
             Object.keys(this.routes).forEach(routeName => {
-                if (msg[routeName] === true) {
+                if (routes[routeName] === true) {
                     this.activateRoute(routeName)
-                } else if (msg[routeName] === false) {
+                } else if (routes[routeName] === false) {
                     this.deactivateRoute(routeName)
                 }
             })
 
-            if (msg.labels) {
-                Object.keys(msg.labels).forEach(name => {
-                    const label = msg.labels[name]
-                    if (label.value !== undefined) {
-                        this.setLineValue(name, label.value)
-                    }
-                    if (label.sublabel !== undefined) {
-                        this.setLineSubLabel(name, label.sublabel)
-                    }
-                })
-            }
+            Object.keys(labels).forEach(name => {
+                const label = labels[name]
+                if (label.value !== undefined) {
+                    this.setLineValue(name, label.value)
+                }
+                if (label.sublabel !== undefined) {
+                    this.setLineSubLabel(name, label.sublabel)
+                }
+            })
         },
         activateRoute (routeName) {
             const route = this.routes[routeName]
