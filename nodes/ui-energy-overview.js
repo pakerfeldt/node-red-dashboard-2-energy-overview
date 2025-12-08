@@ -1,4 +1,13 @@
 module.exports = function(RED) {
+	const path = require('path')
+
+	const resourcePath = path.join(__dirname, '..', 'resources')
+	RED.httpNode.get('/ui-energy-overview/resources/*', function(req, res) {
+		const filename = req.params[0]
+		const filepath = path.join(resourcePath, filename)
+		res.sendFile(filepath)
+	})
+
 	/**
 	 * Validates and clamps a numeric value to a specified range
 	 * @param {*} value - The value to validate
