@@ -7,7 +7,7 @@
             group: { type: 'ui-group', required: true },
             order: { value: 0 },
             width: {
-                value: 6,
+                value: 0,
                 validate: function (v) {
                     const width = v || 0
                     const currentGroup = $('#node-input-group').val() || this.group
@@ -17,7 +17,7 @@
                     return valid
                 }
             },
-            height: { value: 6 },
+            height: { value: 0 },
             pulseColor: { value: "#4dcbbf" },
             image: { value: "" },
             customPaths: { 
