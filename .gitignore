@@ -31,3 +31,6 @@ package-lock.json
 development/
 .node-red-dev
 *.old.*
+
+# Build artifacts
+resources/*.umd.js
