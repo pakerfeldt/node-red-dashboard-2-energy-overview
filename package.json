@@ -39,7 +39,7 @@
     },
     "dependencies": {},
     "peerDependencies": {
-        "@flowfuse/node-red-dashboard": ">=1.29.0"
+        "@flowfuse/node-red-dashboard": ">=1.22.0"
     },
     "devDependencies": {
         "vue": "^3.3.8",
