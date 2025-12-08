@@ -179,8 +179,6 @@ Size 2144 × 1984 pixels
 
 - Maintain the isometric view for consistency with the energy flow paths
 - Ensure clear visibility of key components (solar panels, inverter, battery, EV charger)
-- Use consistent lighting and color scheme
-- Keep the layout similar to enable proper path scaling
 - Consider the 2144 × 1984 pixel aspect ratio for optimal display
 
 ## License
