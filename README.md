@@ -24,10 +24,7 @@ Search for `node-red-dashboard-2-energy-overview` in the Node-RED palette manage
 
 ### Via npm
 
-```bash
-cd ~/.node-red
-npm install node-red-dashboard-2-energy-overview
-```
+Due to [Issue #1159](https://github.com/FlowFuse/node-red-dashboard/issues/1159), it might be difficult to pre-install this widget.
 
 # Usage
 
