@@ -16,7 +16,7 @@
 <script>
 import { mapState } from 'vuex'
 
-const DEFAULT_HOUSE_IMAGE = '/resources/node-red-dashboard-2-energy-overview/house.webp'
+const DEFAULT_HOUSE_IMAGE = '/ui-energy-overview/resources/house.webp'
 
 export default {
     name: 'UIEnergyOverview',
