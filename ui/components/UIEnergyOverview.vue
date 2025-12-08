@@ -39,6 +39,7 @@ export default {
             pulses: {},
             labelLines: {},
             pulseGroups: {},
+            routeStates: {},
 
 
             defaultPulsePathsData: {
@@ -403,7 +404,6 @@ export default {
                     this.animationFrameId = requestAnimationFrame(animate)
                 } catch (error) {
                     console.error('[UIEnergyOverview] Animation frame error:', error)
-                    // Stop animation loop on error to prevent infinite error spam
                     if (this.animationFrameId) {
                         cancelAnimationFrame(this.animationFrameId)
                         this.animationFrameId = null
@@ -417,11 +417,21 @@ export default {
             const routes = payload.routes || {}
             const labels = payload.labels || {}
 
+            // Only process routes that have actually changed state
             Object.keys(this.routes).forEach(routeName => {
-                if (routes[routeName] === true) {
-                    this.activateRoute(routeName)
-                } else if (routes[routeName] === false) {
-                    this.deactivateRoute(routeName)
+                const newState = routes[routeName]
+                const currentState = this.routeStates[routeName]
+                
+                // Only process if state actually changed
+                if (newState !== currentState) {
+                    if (newState === true) {
+                        this.activateRoute(routeName)
+                    } else if (newState === false) {
+                        this.deactivateRoute(routeName)
+                    }
+                    
+                    // Update tracked state
+                    this.routeStates[routeName] = newState
                 }
             })
 
@@ -441,6 +451,7 @@ export default {
 
             if (route.opposite) {
                 this.deactivateRoute(route.opposite)
+                this.routeStates[route.opposite] = false
             }
 
             const group = this.pulseGroups[route.group]
@@ -448,10 +459,19 @@ export default {
 
             const now = performance.now()
             group.forEach(p => {
+                const wasActive = p.active
+                const sameDirection = p.reverse === route.reverse
+                
                 p.reverse = route.reverse
                 p.active = true
-                p.cycleStart = now
-                p.globalAlpha = 1
+                
+                // Only restart animation cycle if:
+                // 1. Route was inactive, OR
+                // 2. Direction changed (bidirectional flow change)
+                if (!wasActive || !sameDirection) {
+                    p.cycleStart = now
+                    p.globalAlpha = 1
+                }
             })
         },
         deactivateRoute (routeName) {
@@ -466,6 +486,8 @@ export default {
                 p.cycleStart = null
                 p.circles.forEach(c => c.setAttribute('visibility', 'hidden'))
             })
+            
+            this.routeStates[routeName] = false
         },
         scalePath (pathData) {
             return pathData.replace(/(-?\d+\.?\d*)/g, (match) => {
