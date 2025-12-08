@@ -34,3 +34,4 @@ development/
 
 # Build artifacts
 resources/*.umd.js
+*.tgz
