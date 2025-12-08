@@ -57,6 +57,15 @@ module.exports = function(RED) {
 		strokeWidth: { min: 1, max: 10, default: 3.2 }
 	}
 
+	const BIDIRECTIONAL_ROUTES = {
+		inverterToGrid: 'gridToInverter',
+		gridToInverter: 'inverterToGrid',
+		inverterToBattery: 'batteryToInverter',
+		batteryToInverter: 'inverterToBattery',
+		inverterToCar: 'carToInverter',
+		carToInverter: 'inverterToCar'
+	}
+
 	function UIEnergyOverviewNode(config) {
 		RED.nodes.createNode(this, config)
 
@@ -99,6 +108,16 @@ module.exports = function(RED) {
 				// Deep merge routes: preserve existing routes not in the new message
 				const existingRoutes = existingPayload.routes || {}
 				const newRoutes = msg.payload.routes || {}
+				
+				Object.keys(newRoutes).forEach(function(routeName) {
+					if (newRoutes[routeName] === true && BIDIRECTIONAL_ROUTES[routeName]) {
+						const oppositeRoute = BIDIRECTIONAL_ROUTES[routeName]
+						if (newRoutes[oppositeRoute] === undefined) {
+							newRoutes[oppositeRoute] = false
+						}
+					}
+				})
+				
 				msg.payload.routes = {
 					...existingRoutes,
 					...newRoutes
