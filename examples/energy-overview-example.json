@@ -1,0 +1,149 @@
+[
+    {
+        "id": "energy-overview-example-flow",
+        "type": "tab",
+        "label": "Energy Overview Example",
+        "disabled": false,
+        "info": "A simple example showing how to use the Energy Overview widget to visualize energy flow between solar panels, home, and grid."
+    },
+    {
+        "id": "example-comment",
+        "type": "comment",
+        "z": "energy-overview-example-flow",
+        "name": "Energy Overview Widget Example",
+        "info": "This flow demonstrates the Energy Overview widget.\n\n**How to use:**\n1. Click the \"Solar Production\" inject to simulate solar panels producing energy\n2. Click \"Grid Import\" to simulate importing from the grid\n3. Click \"Battery Charging\" to simulate battery charging from solar\n4. Click \"Stop All\" to disable all energy flows\n\n**Payload structure:**\n```json\n{\n  \"routes\": {\n    \"solarToInverter\": true,\n    \"inverterToHome\": true\n  },\n  \"labels\": {\n    \"solar\": { \"value\": \"3.2 kW\", \"sublabel\": \"Producing\" },\n    \"home\": { \"value\": \"1.5 kW\", \"sublabel\": \"Consuming\" }\n  }\n}\n```\n\n**Available routes:**\n- solarToInverter\n- inverterToHome\n- inverterToGrid / gridToInverter\n- inverterToBattery / batteryToInverter\n- inverterToCar / carToInverter",
+        "x": 180,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "inject-solar",
+        "type": "inject",
+        "z": "energy-overview-example-flow",
+        "name": "Solar Production",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"routes\":{\"solarToInverter\":true,\"inverterToHome\":true},\"labels\":{\"solar\":{\"value\":\"3.2 kW\",\"sublabel\":\"Producing\"},\"home\":{\"value\":\"1.5 kW\",\"sublabel\":\"Consuming\"}}}",
+        "payloadType": "json",
+        "x": 140,
+        "y": 160,
+        "wires": [
+            [
+                "energy-overview-node"
+            ]
+        ]
+    },
+    {
+        "id": "inject-grid",
+        "type": "inject",
+        "z": "energy-overview-example-flow",
+        "name": "Grid Import",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"routes\":{\"solarToInverter\":false,\"gridToInverter\":true,\"inverterToHome\":true},\"labels\":{\"solar\":{\"value\":\"0 kW\",\"sublabel\":\"Night\"},\"grid\":{\"value\":\"2.1 kW\",\"sublabel\":\"Importing\"},\"home\":{\"value\":\"2.1 kW\",\"sublabel\":\"Consuming\"}}}",
+        "payloadType": "json",
+        "x": 130,
+        "y": 220,
+        "wires": [
+            [
+                "energy-overview-node"
+            ]
+        ]
+    },
+    {
+        "id": "inject-battery",
+        "type": "inject",
+        "z": "energy-overview-example-flow",
+        "name": "Battery Charging",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"routes\":{\"solarToInverter\":true,\"inverterToHome\":true,\"inverterToBattery\":true},\"labels\":{\"solar\":{\"value\":\"5.5 kW\",\"sublabel\":\"Producing\"},\"home\":{\"value\":\"1.2 kW\",\"sublabel\":\"Consuming\"},\"battery\":{\"value\":\"65%\",\"sublabel\":\"Charging\"}}}",
+        "payloadType": "json",
+        "x": 140,
+        "y": 280,
+        "wires": [
+            [
+                "energy-overview-node"
+            ]
+        ]
+    },
+    {
+        "id": "inject-stop",
+        "type": "inject",
+        "z": "energy-overview-example-flow",
+        "name": "Stop All",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "reset",
+                "v": "true",
+                "vt": "bool"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"routes\":{},\"labels\":{\"solar\":{\"value\":\"0 kW\",\"sublabel\":\"Idle\"},\"home\":{\"value\":\"0 kW\",\"sublabel\":\"Idle\"},\"grid\":{\"value\":\"0 kW\",\"sublabel\":\"Idle\"},\"battery\":{\"value\":\"--\",\"sublabel\":\"Idle\"}}}",
+        "payloadType": "json",
+        "x": 120,
+        "y": 340,
+        "wires": [
+            [
+                "energy-overview-node"
+            ]
+        ]
+    },
+    {
+        "id": "energy-overview-node",
+        "type": "ui-energy-overview",
+        "z": "energy-overview-example-flow",
+        "name": "Energy Overview",
+        "group": "",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "pulseColor": "#4dcbbf",
+        "image": "",
+        "customPaths": "",
+        "animationSpeed": 150,
+        "trailLength": 120,
+        "trailSpacing": 4,
+        "fadeTime": 1600,
+        "strokeWidth": 3.2,
+        "labelFontSizes": "{\"value\":42,\"name\":32,\"sub\":32}",
+        "labelSpacing": "{\"textOffset\":16,\"valueLabelGap\":8,\"labelSubGap\":10}",
+        "x": 390,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    }
+]
