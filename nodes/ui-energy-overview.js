@@ -90,6 +90,41 @@ module.exports = function(RED) {
 					delete msg.reset
 				}
 
+				// Apply dynamic property updates (ui_update) even when no payload is present
+				const updates = msg.ui_update
+				if (updates) {
+					// Validate and set pulseColor
+					if (typeof updates.pulseColor !== 'undefined') {
+						if (isValidColor(updates.pulseColor)) {
+							base.stores.state.set(base, node, msg, 'pulseColor', updates.pulseColor)
+						} else {
+							node.warn(`Invalid pulseColor value: ${updates.pulseColor}. Expected hex color (e.g., #4dcbbf)`)
+						}
+					}
+
+					// Validate and set image
+					if (typeof updates.image !== 'undefined') {
+						if (isValidImageUrl(updates.image)) {
+							base.stores.state.set(base, node, msg, 'image', updates.image)
+						} else {
+							node.warn(`Invalid image value: ${updates.image}. Expected URL or path to image`)
+						}
+					}
+
+					// Validate and set numeric animation settings
+					Object.keys(VALIDATION_RULES).forEach(function(key) {
+						if (typeof updates[key] !== 'undefined') {
+							const rule = VALIDATION_RULES[key]
+							const result = validateNumericRange(updates[key], rule.min, rule.max, rule.default)
+							if (result.valid) {
+								base.stores.state.set(base, node, msg, key, result.value)
+							} else {
+								node.warn(`Invalid ${key} value: ${updates[key]}. Expected number between ${rule.min} and ${rule.max}`)
+							}
+						}
+					})
+				}
+
 				if (!msg.payload || typeof msg.payload !== 'object') {
 					if (shouldReset) {
 						// Reset with no payload - clear everything
@@ -129,40 +164,6 @@ module.exports = function(RED) {
 				msg.payload.labels = {
 					...existingLabels,
 					...newLabels
-				}
-
-				const updates = msg.ui_update
-				if (updates) {
-					// Validate and set pulseColor
-					if (typeof updates.pulseColor !== 'undefined') {
-						if (isValidColor(updates.pulseColor)) {
-							base.stores.state.set(base, node, msg, 'pulseColor', updates.pulseColor)
-						} else {
-							node.warn(`Invalid pulseColor value: ${updates.pulseColor}. Expected hex color (e.g., #4dcbbf)`)
-						}
-					}
-
-					// Validate and set image
-					if (typeof updates.image !== 'undefined') {
-						if (isValidImageUrl(updates.image)) {
-							base.stores.state.set(base, node, msg, 'image', updates.image)
-						} else {
-							node.warn(`Invalid image value: ${updates.image}. Expected URL or path to image`)
-						}
-					}
-
-					// Validate and set numeric animation settings
-					Object.keys(VALIDATION_RULES).forEach(function(key) {
-						if (typeof updates[key] !== 'undefined') {
-							const rule = VALIDATION_RULES[key]
-							const result = validateNumericRange(updates[key], rule.min, rule.max, rule.default)
-							if (result.valid) {
-								base.stores.state.set(base, node, msg, key, result.value)
-							} else {
-								node.warn(`Invalid ${key} value: ${updates[key]}. Expected number between ${rule.min} and ${rule.max}`)
-							}
-						}
-					})
 				}
 				return msg
 			},

@@ -1110,11 +1110,13 @@
             for (const name of Object.keys(labelPathDefs)) {
                 const input = document.getElementById(`path-${name}`);
                 const alignSelect = document.getElementById(`align-${name}`);
+				const labelName = document.getElementById(`label-${name}`);
                 if (input && input.value.trim()) {
                     const align = alignSelect ? alignSelect.value : labelPathDefs[name].align;
                     labels[name] = {
                         position: input.value.trim(),
-                        align: align
+                        align: align,
+						text: labelName.value.trim()
                     };
                 }
             }

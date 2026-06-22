@@ -40,6 +40,16 @@ export default {
             labelLines: {},
             pulseGroups: {},
             routeStates: {},
+            buildScheduled: false,
+            // Clamp ranges mirror the server-side validation in nodes/ui-energy-overview.js
+            // so live updates match what gets persisted.
+            DYNAMIC_NUMERIC_RULES: {
+                animationSpeed: { min: 50, max: 500 },
+                trailLength: { min: 50, max: 300 },
+                trailSpacing: { min: 1, max: 20 },
+                fadeTime: { min: 500, max: 3000 },
+                strokeWidth: { min: 1, max: 10 }
+            },
 
 
             defaultPulsePathsData: {
@@ -344,13 +354,51 @@ export default {
             const updates = msg.ui_update
             if (!updates) return
 
+            // Collect the properties to apply. Pass-through fields (color/image) keep their
+            // raw value; numeric fields are clamped to the same ranges the node validates.
+            const provided = {}
             if (typeof updates.pulseColor !== 'undefined') {
-                this.setDynamicProperties({ pulseColor: updates.pulseColor })
-                this.updatePulseColors()
+                provided.pulseColor = updates.pulseColor
             }
             if (typeof updates.image !== 'undefined') {
-                this.setDynamicProperties({ image: updates.image })
+                provided.image = updates.image
             }
+            Object.keys(this.DYNAMIC_NUMERIC_RULES).forEach(key => {
+                if (typeof updates[key] !== 'undefined') {
+                    const num = parseFloat(updates[key])
+                    if (!isNaN(num)) {
+                        const rule = this.DYNAMIC_NUMERIC_RULES[key]
+                        provided[key] = Math.min(Math.max(num, rule.min), rule.max)
+                    }
+                }
+            })
+            if (Object.keys(provided).length === 0) return
+
+            // A changing image reloads the <img>, and its load handler rebuilds the whole
+            // overlay (re-fitting to the new dimensions) — so we skip the in-place patches
+            // in that case; the rebuild already reads the freshly-committed values.
+            const imageWillReload = typeof provided.image !== 'undefined' &&
+                provided.image !== (this.getProperty('image') || '')
+
+            // Commit first so the computed properties reflect the new values.
+            this.setDynamicProperties(provided)
+
+            this.$nextTick(() => {
+                if (!this.imageLoaded || imageWillReload) return
+
+                if (typeof provided.strokeWidth !== 'undefined') {
+                    this.updateStrokeWidth()
+                }
+                if (typeof provided.trailLength !== 'undefined' || typeof provided.trailSpacing !== 'undefined') {
+                    this.updateTrails()
+                }
+                if (typeof provided.animationSpeed !== 'undefined' || typeof provided.fadeTime !== 'undefined') {
+                    this.updateTiming()
+                }
+                if (typeof provided.pulseColor !== 'undefined') {
+                    this.updatePulseColors()
+                }
+            })
         },
         updatePulseColors () {
             Object.values(this.pulses).forEach(p => {
@@ -367,15 +415,45 @@ export default {
         onImageLoad () {
             const img = this.$refs.baseImage
             const svg = this.$refs.overlay
-            if (!img || !svg || this.imageLoaded) return
+            if (!img || !svg) return
+
+            this.imageLoaded = true
+
+            // Fires on the initial load and again whenever the image source changes.
+            // Coalesce multiple loads in the same tick into a single (re)build.
+            if (this.buildScheduled) return
+            this.buildScheduled = true
+            this.$nextTick(() => {
+                this.buildScheduled = false
+                this.buildOverlay()
+            })
+        },
+        clearOverlay (svg) {
+            // Remove everything we generated, but keep the static <defs> (blur filter).
+            Array.from(svg.childNodes).forEach(node => {
+                if (node.nodeType === 1 && node.tagName.toLowerCase() === 'defs') return
+                svg.removeChild(node)
+            })
+        },
+        buildOverlay () {
+            const img = this.$refs.baseImage
+            const svg = this.$refs.overlay
+            if (!img || !svg) return
 
             const w = img.naturalWidth
             const h = img.naturalHeight
+            if (!w || !h) return
 
+            // Stop the running loop before tearing down the pulses it reads from.
+            if (this.animationFrameId) {
+                cancelAnimationFrame(this.animationFrameId)
+                this.animationFrameId = null
+            }
+
+            // Re-fit the overlay to the (possibly new) image dimensions.
             const scaleX = w / this.REF_WIDTH
             const scaleY = h / this.REF_HEIGHT
             this.scaleFactor = (scaleX + scaleY) / 2
-
             svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
 
             const blurFilter = svg.querySelector('#pulseBlur feGaussianBlur')
@@ -383,19 +461,110 @@ export default {
                 blurFilter.setAttribute('stdDeviation', this.BLUR_STD_DEV.toFixed(1))
             }
 
-            this.imageLoaded = true
+            // Reset model + DOM, then rebuild from scratch.
+            this.clearOverlay(svg)
+            this.pulses = {}
+            this.labelLines = {}
+            this.pulseGroups = {}
+            this.routeStates = {}
 
-            this.$nextTick(() => {
-                this.initializePulses(svg)
-                this.createLabelLines(svg)
-                this.configureGlobalTiming()
-                this.startAnimationLoop()
+            this.initializePulses(svg)
+            this.createLabelLines(svg)
+            this.configureGlobalTiming()
+            this.startAnimationLoop()
 
-                const storedMsg = this.messages && this.messages[this.id]
-                if (storedMsg) {
-                    this.handleMessage(storedMsg)
+            // Restore active routes and label values from the last message.
+            const storedMsg = this.messages && this.messages[this.id]
+            if (storedMsg) {
+                this.handleMessage(storedMsg)
+            }
+        },
+        updateStrokeWidth () {
+            const strokeWidth = this.STROKE_WIDTH.toFixed(1)
+            const radius = (this.STROKE_WIDTH * 1.1).toFixed(1)
+            Object.values(this.pulses).forEach(p => {
+                if (p.path) {
+                    p.path.setAttribute('stroke-width', strokeWidth)
+                }
+                p.circles.forEach(c => c.setAttribute('r', radius))
+            })
+        },
+        updateTrails () {
+            const svgNS = 'http://www.w3.org/2000/svg'
+            const spacing = this.TRAIL_SPACING_PX
+            const radius = (this.STROKE_WIDTH * 1.1).toFixed(1)
+            Object.values(this.pulses).forEach(p => {
+                const maxDotsForPath = Math.floor(p.length / spacing) + 1
+                const newCount = Math.min(this.TRAIL_MAX_DOTS, maxDotsForPath)
+
+                // Grow: append new circles to the live group.
+                while (p.circles.length < newCount) {
+                    const circle = document.createElementNS(svgNS, 'circle')
+                    circle.setAttribute('r', radius)
+                    circle.setAttribute('fill', this.pulseColor)
+                    circle.setAttribute('fill-opacity', '0')
+                    circle.setAttribute('visibility', 'hidden')
+                    p.group.appendChild(circle)
+                    p.circles.push(circle)
+                }
+                // Shrink: drop surplus circles from the DOM.
+                while (p.circles.length > newCount) {
+                    const circle = p.circles.pop()
+                    if (circle && circle.parentNode) {
+                        circle.parentNode.removeChild(circle)
+                    }
+                }
+
+                p.trailCount = newCount
+                p.trailSpacingPx = spacing
+            })
+        },
+        updateTiming () {
+            const now = performance.now()
+            const speed = this.SPEED_PX_PER_SEC
+
+            // Capture where each active pulse is in its cycle under the OLD timing.
+            const snapshots = {}
+            Object.entries(this.pulses).forEach(([name, p]) => {
+                if (p.active && p.cycleStart !== null && p.globalCycleDuration > 0) {
+                    const localElapsed = (now - p.cycleStart) % p.globalCycleDuration
+                    snapshots[name] = this.capturePhase(p, localElapsed)
                 }
             })
+
+            // Apply the new speed/travel durations, then recompute global timing
+            // (which also refreshes fadeDuration/idleDuration from the new fadeTime).
+            Object.values(this.pulses).forEach(p => {
+                p.speed = speed
+                p.travelDuration = (p.length / speed) * 1000
+            })
+            this.configureGlobalTiming()
+
+            // Rebase cycleStart so each pulse continues from its current position/phase
+            // under the new timing — no visible jump.
+            Object.entries(this.pulses).forEach(([name, p]) => {
+                const snap = snapshots[name]
+                if (!snap) return
+                p.cycleStart = now - this.phaseToLocal(p, snap)
+            })
+        },
+        capturePhase (p, localElapsed) {
+            if (localElapsed < p.travelDuration) {
+                return { phase: 'travel', frac: p.travelDuration > 0 ? localElapsed / p.travelDuration : 0 }
+            } else if (localElapsed < p.travelDuration + p.fadeDuration) {
+                const fadeElapsed = localElapsed - p.travelDuration
+                return { phase: 'fade', frac: p.fadeDuration > 0 ? fadeElapsed / p.fadeDuration : 0 }
+            }
+            const idleElapsed = localElapsed - p.travelDuration - p.fadeDuration
+            return { phase: 'idle', frac: p.idleDuration > 0 ? idleElapsed / p.idleDuration : 0 }
+        },
+        phaseToLocal (p, snap) {
+            if (snap.phase === 'travel') {
+                return snap.frac * p.travelDuration
+            } else if (snap.phase === 'fade') {
+                return p.travelDuration + snap.frac * p.fadeDuration
+            }
+            return p.travelDuration + p.fadeDuration + snap.frac * p.idleDuration
         },
         startAnimationLoop () {
             const animate = (time) => {
@@ -739,11 +908,13 @@ export default {
             return undefined
         },
         setDynamicProperties (updates) {
-            // Update dynamic properties - this would be called by the parent component
+            // Update dynamic properties reactively via the Dashboard store.
+            // Vue 3 removed this.$set; the framework's own widgets commit to ui/widgetState.
             Object.keys(updates).forEach(key => {
-                if (this.state) {
-                    this.$set(this.state, key, updates[key])
-                }
+                this.$store.commit('ui/widgetState', {
+                    widgetId: this.id,
+                    config: { [key]: updates[key] }
+                })
             })
         }
     }
