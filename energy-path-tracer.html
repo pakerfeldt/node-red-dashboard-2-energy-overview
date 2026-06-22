@@ -1116,36 +1116,10 @@
         });
 
         // Export for Node-RED node configuration (JSON format)
+        // Export for Node-RED node configuration (JSON format)
         exportBtn.addEventListener('click', () => {
-            const descriptors = buildDescriptors();
-            const energyPaths = {};
-            const labels = {};
-
-            descriptors.forEach(function (d) {
-                if (d.segments && d.segments.length) {
-                    if (d.segments.length === 1) {
-                        const routes = Topology.deriveTopology({ [d.name]: { direction: d.direction } }).routes;
-                        Object.keys(routes).forEach(function (routeName) {
-                            if (d.segments[0] && d.segments[0].trim()) {
-                                energyPaths[routeName] = d.segments[0].trim();
-                            }
-                        });
-                    } else {
-                        const routes = Topology.deriveTopology({ [d.name]: { direction: d.direction } }).routes;
-                        const routeNames = Object.keys(routes);
-                        d.segments.forEach(function (seg, i) {
-                            if (seg && seg.trim() && routeNames[i]) {
-                                energyPaths[routeNames[i]] = seg.trim();
-                            }
-                        });
-                    }
-                }
-                if (d.labelPosition && d.labelPosition.trim()) {
-                    labels[d.name] = { position: d.labelPosition.trim(), align: d.align, text: d.label };
-                }
-            });
-
-            const exportObj = { energyPaths: energyPaths, labels: labels };
+            if (exportBtn.disabled) return;
+            const exportObj = TracerIO.buildCustomPaths(buildDescriptors(), Topology);
             const output = JSON.stringify(exportObj, null, 2);
             exportArea.value = output;
 
@@ -1189,51 +1163,21 @@
 
         modalLoadBtn.addEventListener('click', () => {
             const input = loadJsonInput.value.trim();
-            if (!input) {
-                alert('Please paste JSON data');
+            if (!input) { alert('Please paste JSON data'); return; }
+
+            let parsed;
+            try { parsed = JSON.parse(input); }
+            catch (e) { alert('Error parsing JSON: ' + e.message); return; }
+
+            if (!parsed.energyPaths && !parsed.labels && !parsed.entities) {
+                alert('Invalid JSON format. Expected { entities?, energyPaths, labels }');
                 return;
             }
 
-            try {
-                const parsed = JSON.parse(input);
-
-                if (!parsed.energyPaths && !parsed.labels) {
-                    alert('Invalid JSON format. Expected { energyPaths: {...}, labels: {...} }');
-                    return;
-                }
-
-                // Rebuild entity model from the loaded JSON.
-                // TracerIO.descriptorsFromExport converts the old energyPaths+labels
-                // format to entity descriptors; fall back to raw import if unavailable.
-                let newEntities = null;
-                if (typeof TracerIO !== 'undefined' && TracerIO.descriptorsFromExport) {
-                    const descriptors = TracerIO.descriptorsFromExport(parsed);
-                    newEntities = descriptors.map(descriptorToEntity);
-                } else if (parsed.labels) {
-                    // Minimal fallback: build from labels only
-                    newEntities = Object.keys(parsed.labels).map(function (name) {
-                        const labelData = parsed.labels[name];
-                        return descriptorToEntity({
-                            name: name,
-                            direction: Topology.DEFAULT_ENTITIES[name] ? Topology.DEFAULT_ENTITIES[name].direction : 'both',
-                            segments: [],
-                            labelPosition: labelData.position || '',
-                            label: labelData.text || name.toUpperCase(),
-                            align: labelData.align || 'top'
-                        });
-                    });
-                }
-
-                if (newEntities && newEntities.length) {
-                    setModel(newEntities);
-                }
-
-                loadJsonModal.style.display = 'none';
-                renderAllPaths();
-                
-            } catch (e) {
-                alert('Error parsing JSON: ' + e.message);
-            }
+            const result = TracerIO.parseCustomPaths(parsed, Topology.DEFAULT_ENTITIES, Topology);
+            setModel(result.descriptors.map(function (d) { return descriptorToEntity(d); }));
+            loadJsonModal.style.display = 'none';
+            if (result.notices.length) alert(result.notices.join('\n'));
         });
 
         // Initialize
