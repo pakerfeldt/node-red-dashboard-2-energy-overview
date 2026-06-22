@@ -15,6 +15,7 @@
 
 <script>
 import { mapState } from 'vuex'
+import EnergyTopology from '../../nodes/topology.js'
 
 const DEFAULT_HOUSE_IMAGE = '/ui-energy-overview/resources/house.webp'
 
@@ -66,48 +67,6 @@ export default {
                 grid: { d: 'M 448 850 L 448 921', align: 'bottom', label: 'GRID' },
                 battery: { d: 'M 643 772 L 643 921', align: 'bottom', label: 'BATTERY' },
                 car: { d: 'M 103 820 L 103 921', align: 'bottom', label: 'CAR' }
-            },
-            routes: {
-                solarToInverter: {
-                    group: 'solar',
-                    reverse: false,
-                    opposite: null
-                },
-                inverterToHome: {
-                    group: 'home',
-                    reverse: false,
-                    opposite: null
-                },
-                inverterToGrid: {
-                    group: 'grid',
-                    reverse: false,
-                    opposite: 'gridToInverter'
-                },
-                gridToInverter: {
-                    group: 'grid',
-                    reverse: true,
-                    opposite: 'inverterToGrid'
-                },
-                inverterToBattery: {
-                    group: 'battery',
-                    reverse: false,
-                    opposite: 'batteryToInverter'
-                },
-                batteryToInverter: {
-                    group: 'battery',
-                    reverse: true,
-                    opposite: 'inverterToBattery'
-                },
-                inverterToCar: {
-                    group: 'car',
-                    reverse: false,
-                    opposite: 'carToInverter'
-                },
-                carToInverter: {
-                    group: 'car',
-                    reverse: true,
-                    opposite: 'inverterToCar'
-                }
             }
         }
     },
@@ -216,6 +175,12 @@ export default {
                 console.warn('[UIEnergyOverview] Invalid custom paths JSON, using defaults:', e.message)
                 return null
             }
+        },
+        activeEntities () {
+            return EnergyTopology.parseEntities(this.getProperty('customPaths')) || EnergyTopology.DEFAULT_ENTITIES
+        },
+        topology () {
+            return EnergyTopology.deriveTopology(this.activeEntities)
         },
         pulsePathsData () {
             const custom = this.parsedCustomPaths
@@ -587,7 +552,7 @@ export default {
             const labels = payload.labels || {}
 
             // Only process routes that have actually changed state
-            Object.keys(this.routes).forEach(routeName => {
+            Object.keys(this.topology.routes).forEach(routeName => {
                 const newState = routes[routeName]
                 const currentState = this.routeStates[routeName]
                 
@@ -615,7 +580,7 @@ export default {
             })
         },
         activateRoute (routeName) {
-            const route = this.routes[routeName]
+            const route = this.topology.routes[routeName]
             if (!route) return
 
             if (route.opposite) {
@@ -644,7 +609,7 @@ export default {
             })
         },
         deactivateRoute (routeName) {
-            const route = this.routes[routeName]
+            const route = this.topology.routes[routeName]
             if (!route) return
 
             const group = this.pulseGroups[route.group]
@@ -677,17 +642,13 @@ export default {
                 this.pulses[name] = this.createPulseForPath(path, svg, svgNS)
             })
 
-            this.pulseGroups.solar = [this.pulses.solarToInverter].filter(Boolean)
-            
-            const homePaths = Object.keys(this.pulses)
-                .filter(name => name.startsWith('inverterToHome'))
-                .map(name => this.pulses[name])
-                .filter(Boolean)
-            this.pulseGroups.home = homePaths.length > 0 ? homePaths : []
-            
-            this.pulseGroups.grid = [this.pulses.inverterToGrid].filter(Boolean)
-            this.pulseGroups.battery = [this.pulses.inverterToBattery].filter(Boolean)
-            this.pulseGroups.car = [this.pulses.inverterToCar].filter(Boolean)
+            const grouped = EnergyTopology.matchPulseGroups(Object.keys(this.pulses), this.topology.pulseGroupKeys)
+            this.pulseGroups = {}
+            Object.keys(grouped).forEach(entity => {
+                this.pulseGroups[entity] = grouped[entity]
+                    .map(name => this.pulses[name])
+                    .filter(Boolean)
+            })
         },
         createPulseForPath (path, svg, svgNS) {
             const length = path.getTotalLength()

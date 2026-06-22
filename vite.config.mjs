@@ -23,6 +23,10 @@ export default defineConfig({
     build: {
         sourcemap: process.env.NODE_ENV === 'development',
 
+        commonjsOptions: {
+            include: [/nodes\/topology\.js$/, /node_modules/]
+        },
+
         lib: {
             entry: resolve(__dirname, 'ui/index.js'),
             name: LIBRARY_NAME,
