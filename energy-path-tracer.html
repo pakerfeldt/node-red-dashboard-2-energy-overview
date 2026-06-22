@@ -659,7 +659,29 @@
                     startDrawing(btn.dataset.entity, btn.dataset.kind, seg);
                 });
             });
-            // .seg-add / .seg-remove / .entity-delete are wired in Task 5
+            card.querySelector('.seg-add').addEventListener('click', function () {
+                ent.segments.push('');
+                renderCards();
+                renderAllPaths();
+            });
+            card.querySelectorAll('.seg-remove').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const i = parseInt(btn.dataset.seg, 10);
+                    if (currentDrawTarget && currentDrawTarget.entityId === ent.id && currentDrawTarget.kind === 'segment') {
+                        stopDrawing();
+                    }
+                    ent.segments.splice(i, 1);
+                    if (ent.segments.length === 0) ent.segments.push('');
+                    renderCards();
+                    renderAllPaths();
+                });
+            });
+            card.querySelector('.entity-delete').addEventListener('click', function () {
+                if (currentDrawTarget && currentDrawTarget.entityId === ent.id) stopDrawing();
+                entities = entities.filter(function (e) { return e.id !== ent.id; });
+                renderCards();
+                renderAllPaths();
+            });
             updateKeysCaption(ent);
         }
 
@@ -685,8 +707,22 @@
             addEntityBtn.addEventListener('click', onAddEntity);
         }
 
-        // onAddEntity is defined in Task 5.
-        function onAddEntity() {}
+        function uniqueName(base) {
+            const taken = entities.map(function (e) { return e.name; });
+            if (taken.indexOf(base) === -1) return base;
+            let i = 2;
+            while (taken.indexOf(base + i) !== -1) i++;
+            return base + i;
+        }
+
+        function onAddEntity() {
+            entities.push(descriptorToEntity({
+                name: uniqueName('entity'), direction: 'source',
+                segments: [''], labelPosition: '', label: '', align: 'top'
+            }));
+            renderCards();
+            renderAllPaths();
+        }
 
 
         // Image loading
