@@ -391,16 +391,21 @@
         
         <div class="info-box">
             <strong>Instructions:</strong><br>
-            1. Click "Draw" on a path to start tracing<br>
-            2. Click on the image to add points (first point = start)<br>
-            3. Hold <strong>Shift</strong> to snap to horizontal/vertical lines<br>
-            4. Edit the text field to adjust paths manually<br>
-            5. Esc or End button to stop drawing<br>
+            1. Each entity has a <strong>name</strong> and a <strong>direction</strong>
+               (source = into inverter, sink = out of inverter, both = bidirectional).<br>
+            2. Use <strong>+ Add</strong> to add an entity, <strong>×</strong> to delete one,
+               and <strong>+ segment</strong> for multi-part paths (like Home).<br>
+            3. Click "Draw" on a segment or label, then click on the image to add points
+               (first point = start).<br>
+            4. Hold <strong>Shift</strong> to snap to horizontal/vertical lines. Esc or End to stop.<br>
+            5. The derived route key(s) are shown under each entity; fix any red errors
+               before exporting.<br>
             <br>
             <strong style="color: #ffd700;">Path Direction:</strong><br>
-            Route paths must be drawn FROM source TO destination.<br>
-            The pulse animates from the first point to the last point.<br>
-            A green dot marks the START, red dot marks the END.
+            Draw FROM source TO destination. The pulse animates first point → last point
+            (green = start, red = end).<br>
+            <em style="color:#888;">Open this tool from the repo root so it can load
+            nodes/topology.js.</em>
         </div>
 
         <h3>Entities
