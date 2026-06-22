@@ -403,11 +403,11 @@
             A green dot marks the START, red dot marks the END.
         </div>
 
-        <h3>Route Paths (Pulse Animations)</h3>
-        <div id="routePaths"></div>
-
-        <h3>Label Paths (Text Labels)</h3>
-        <div id="labelPaths"></div>
+        <h3>Entities
+            <button id="addEntityBtn" style="float:right; background:#4dcbbf; color:#000; border:none; border-radius:4px; padding:3px 10px; font-size:12px; cursor:pointer;">+ Add</button>
+        </h3>
+        <div id="validationSummary" style="font-size:11px; color:#888; margin-bottom:8px;"></div>
+        <div id="entityCards"></div>
 
         <div class="export-area">
             <h3 style="margin-top: 0;">Import / Export</h3>
@@ -464,6 +464,8 @@
         X: 0, Y: 0
     </div>
 
+    <script src="nodes/topology.js"></script>
+    <script src="nodes/tracer-io.js"></script>
     <script>
         // Configuration matching energy-overview.html
         const REF_WIDTH = 1056;
@@ -482,49 +484,66 @@
         const getLabelValueLabelGap = () => 8 * scaleFactor;
         const getLabelLabelSubGap = () => 10 * scaleFactor;
 
-        // Route paths from energy-overview
-        const routePathDefs = {
-            solarToInverter: { 
-                path: "M 427 295 L 484 332 L 484 533", 
-                description: "Solar -> Inverter"
-            },
-            inverterToHome1: { 
-                path: "M 513 532 L 513 445 L 808 451 L 810 549", 
-                description: "Inverter -> Home (left)"
-            },
-            inverterToHome2: { 
-                path: "M 513 532 L 513 445 L 966 455", 
-                description: "Inverter -> Home (right)"
-            },
-            inverterToGrid: { 
-                path: "M 451 631 L 401 631 L 403 821 L 449 848", 
-                description: "Inverter <-> Grid"
-            },
-            inverterToBattery: { 
-                path: "M 499 649 L 499 748 L 594 742", 
-                description: "Inverter <-> Battery"
-            },
-            inverterToCar: { 
-                path: "M 453 586 L 388 585 L 257 587 L 255 658", 
-                description: "Inverter <-> Car"
-            }
+        // Default geometry/labels per entity (tool-specific reference geometry).
+        // Entity identity + direction come from Topology.DEFAULT_ENTITIES.
+        const DEFAULT_GEOMETRY = {
+            solar:   { segments: ['M 427 295 L 484 332 L 484 533'], labelPosition: 'M 608 41 L 608 300', label: 'SOLAR', align: 'top', dummyValue: '2.4 kW', dummySublabel: '12.5 kWh' },
+            home:    { segments: ['M 513 532 L 513 445 L 808 451 L 810 549', 'M 513 532 L 513 445 L 966 455'], labelPosition: 'M 776 41 L 776 445', label: 'HOME', align: 'top', dummyValue: '1.8 kW', dummySublabel: '' },
+            grid:    { segments: ['M 451 631 L 401 631 L 403 821 L 449 848'], labelPosition: 'M 448 850 L 448 921', label: 'GRID', align: 'bottom', dummyValue: '0.3 kW', dummySublabel: 'Importing' },
+            battery: { segments: ['M 499 649 L 499 748 L 594 742'], labelPosition: 'M 643 772 L 643 921', label: 'BATTERY', align: 'bottom', dummyValue: '85%', dummySublabel: 'Charging' },
+            car:     { segments: ['M 453 586 L 388 585 L 257 587 L 255 658'], labelPosition: 'M 103 820 L 103 921', label: 'CAR', align: 'bottom', dummyValue: '11 kW', dummySublabel: '2h 15m left' }
         };
 
-        // Label paths from energy-overview
-        const labelPathDefs = {
-            solar: { path: "M 608 41 L 608 300", align: "top", label: "SOLAR", dummyValue: "2.4 kW", dummySublabel: "12.5 kWh" },
-            home: { path: "M 776 41 L 776 445", align: "top", label: "HOME", dummyValue: "1.8 kW", dummySublabel: "" },
-            grid: { path: "M 448 850 L 448 921", align: "bottom", label: "GRID", dummyValue: "0.3 kW", dummySublabel: "Importing" },
-            battery: { path: "M 643 772 L 643 921", align: "bottom", label: "BATTERY", dummyValue: "85%", dummySublabel: "Charging" },
-            car: { path: "M 103 820 L 103 921", align: "bottom", label: "CAR", dummyValue: "11 kW", dummySublabel: "2h 15m left" }
-        };
+        // Entity model — single source of truth for the sidebar.
+        // entity: { id, name, direction, segments:[str], labelPosition, label, align, dummyValue, dummySublabel, directionGuessed }
+        let entities = [];
+        let idCounter = 0;
+        function nextId() { return 'e' + (++idCounter); }
 
-        // State
-        let currentDrawingPath = null;
+        function descriptorToEntity(d) {
+            const g = DEFAULT_GEOMETRY[d.name] || {};
+            return {
+                id: nextId(),
+                name: d.name,
+                direction: d.direction,
+                segments: (d.segments && d.segments.length) ? d.segments.slice() : [''],
+                labelPosition: d.labelPosition || '',
+                label: d.label || '',
+                align: d.align || 'top',
+                dummyValue: g.dummyValue || '',
+                dummySublabel: g.dummySublabel || '',
+                directionGuessed: !!d.directionGuessed
+            };
+        }
+
+        function defaultEntityList() {
+            return Object.keys(Topology.DEFAULT_ENTITIES).map(function (name) {
+                const g = DEFAULT_GEOMETRY[name] || { segments: [''], labelPosition: '', label: name.toUpperCase(), align: 'top' };
+                return descriptorToEntity({
+                    name: name,
+                    direction: Topology.DEFAULT_ENTITIES[name].direction,
+                    segments: g.segments.slice(),
+                    labelPosition: g.labelPosition || '',
+                    label: g.label || name.toUpperCase(),
+                    align: g.align || 'top'
+                });
+            });
+        }
+
+        function buildDescriptors() {
+            return entities.map(function (e) {
+                return { name: e.name, direction: e.direction, segments: e.segments, labelPosition: e.labelPosition, label: e.label, align: e.align };
+            });
+        }
+
+        function findEntity(id) { return entities.find(function (e) { return e.id === id; }); }
+
+        // Drawing state
+        let currentDrawTarget = null; // { entityId, kind: 'segment'|'label', segIndex }
         let drawMode = 'M';
         let currentPoints = [];
         let imageLoaded = false;
-        let mousePos = null; // Track mouse position for line preview
+        let mousePos = null;
 
         // DOM elements
         const baseImage = document.getElementById('baseImage');
@@ -539,99 +558,136 @@
         const exportArea = document.getElementById('exportArea');
         const imageInput = document.getElementById('imageInput');
         const resetImageBtn = document.getElementById('resetImageBtn');
-        const routePathsContainer = document.getElementById('routePaths');
-        const labelPathsContainer = document.getElementById('labelPaths');
+        const entityCardsContainer = document.getElementById('entityCards');
+        const addEntityBtn = document.getElementById('addEntityBtn');
+        const validationSummary = document.getElementById('validationSummary');
 
-        // Initialize path entries
-        function createPathEntry(name, def, isLabel) {
-            const div = document.createElement('div');
-            div.className = 'path-entry';
-            div.id = `entry-${name}`;
+        function escapeAttr(s) { return String(s == null ? '' : s).replace(/"/g, '&quot;'); }
 
-            let extraHtml = '';
-            if (isLabel) {
-                extraHtml = `
-                    <div class="align-select" style="margin-top: 6px;">
-                        <label style="font-size: 11px; color: #888;">Align:
-                            <select id="align-${name}">
-                                <option value="top" ${def.align === 'top' ? 'selected' : ''}>Top</option>
-                                <option value="bottom" ${def.align === 'bottom' ? 'selected' : ''}>Bottom</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div style="margin-top: 6px;">
-                        <label style="font-size: 11px; color: #888;">Label:</label>
-                        <input type="text" id="label-${name}" value="${def.label || name.toUpperCase()}" 
-                            style="width: 100%; background: #222; color: #fff; border: 1px solid #444; border-radius: 3px; padding: 4px; font-size: 11px; margin-top: 2px;">
-                    </div>
-                    <div class="label-preview">
-                        <div class="value">${def.dummyValue}</div>
-                        <div class="name" id="preview-label-${name}">${def.label || name.toUpperCase()}</div>
-                        <div class="sublabel">${def.dummySublabel}</div>
-                    </div>
-                `;
-            }
-
-            div.innerHTML = `
-                <label>${name} <small style="color:#666;">${def.description || ''}</small></label>
-                <input type="text" id="path-${name}" value="${def.path}" placeholder="M x y L x y...">
-                <div class="path-controls">
-                    <button class="draw-btn" data-path="${name}" data-label="${isLabel}">Draw</button>
-                    <button class="clear-btn" data-path="${name}">Clear</button>
-                </div>
-                ${extraHtml}
-            `;
-
-            return div;
+        function updateKeysCaption(ent) {
+            const caption = document.getElementById('keys-' + ent.id);
+            if (!caption) return;
+            if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(ent.name)) { caption.textContent = '→ (enter a valid name)'; return; }
+            const single = {}; single[ent.name] = { direction: ent.direction };
+            const routes = Topology.deriveTopology(single).routes;
+            caption.textContent = '→ ' + Object.keys(routes).join(' + ');
         }
 
-        // Initialize UI
-        function initUI() {
-            // Route paths
-            for (const [name, def] of Object.entries(routePathDefs)) {
-                routePathsContainer.appendChild(createPathEntry(name, def, false));
-            }
+        function createCard(ent) {
+            const card = document.createElement('div');
+            card.className = 'path-entry';
+            card.id = 'card-' + ent.id;
 
-            // Label paths
-            for (const [name, def] of Object.entries(labelPathDefs)) {
-                labelPathsContainer.appendChild(createPathEntry(name, def, true));
-            }
+            const segmentsHtml = ent.segments.map(function (seg, i) {
+                return '<div class="seg-row" style="display:flex; gap:6px; margin-top:4px;">' +
+                    '<input type="text" id="seg-' + ent.id + '-' + i + '" value="' + escapeAttr(seg) + '" placeholder="M x y L x y..." style="flex:1;">' +
+                    '<button class="draw-btn" data-entity="' + ent.id + '" data-kind="segment" data-seg="' + i + '">Draw</button>' +
+                    '<button class="seg-remove secondary" data-entity="' + ent.id + '" data-seg="' + i + '" title="Remove segment">×</button>' +
+                    '</div>';
+            }).join('');
 
-            // Add event listeners
-            document.querySelectorAll('.draw-btn').forEach(btn => {
-                btn.addEventListener('click', () => startDrawing(btn.dataset.path, btn.dataset.label === 'true'));
+            card.innerHTML =
+                '<div style="display:flex; gap:6px; align-items:center;">' +
+                    '<input type="text" id="name-' + ent.id + '" value="' + escapeAttr(ent.name) + '" placeholder="entity name" style="flex:1; font-weight:bold;">' +
+                    '<select id="dir-' + ent.id + '">' +
+                        '<option value="source"' + (ent.direction === 'source' ? ' selected' : '') + '>source</option>' +
+                        '<option value="sink"' + (ent.direction === 'sink' ? ' selected' : '') + '>sink</option>' +
+                        '<option value="both"' + (ent.direction === 'both' ? ' selected' : '') + '>both</option>' +
+                    '</select>' +
+                    '<button class="entity-delete secondary" data-entity="' + ent.id + '" title="Delete entity">×</button>' +
+                '</div>' +
+                '<div id="keys-' + ent.id + '" style="font-size:10px; color:#4dcbbf; margin-top:4px;"></div>' +
+                '<div id="note-' + ent.id + '" style="font-size:11px; color:#ffd700; margin-top:4px;">' + (ent.directionGuessed ? 'Direction guessed — please verify.' : '') + '</div>' +
+                '<div style="font-size:11px; color:#888; margin-top:8px;">Geometry</div>' +
+                segmentsHtml +
+                '<button class="seg-add" data-entity="' + ent.id + '" style="margin-top:4px; background:#555; font-size:11px;">+ segment</button>' +
+                '<div style="font-size:11px; color:#888; margin-top:8px;">Label</div>' +
+                '<div style="display:flex; gap:6px; margin-top:4px;">' +
+                    '<input type="text" id="lblpos-' + ent.id + '" value="' + escapeAttr(ent.labelPosition) + '" placeholder="label position path" style="flex:1;">' +
+                    '<button class="draw-btn" data-entity="' + ent.id + '" data-kind="label">Draw</button>' +
+                '</div>' +
+                '<div style="display:flex; gap:6px; margin-top:4px;">' +
+                    '<input type="text" id="lbltext-' + ent.id + '" value="' + escapeAttr(ent.label) + '" placeholder="LABEL TEXT" style="flex:1;">' +
+                    '<select id="align-' + ent.id + '">' +
+                        '<option value="top"' + (ent.align === 'top' ? ' selected' : '') + '>top</option>' +
+                        '<option value="bottom"' + (ent.align === 'bottom' ? ' selected' : '') + '>bottom</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div id="err-' + ent.id + '" style="color:#ef4444; font-size:11px; margin-top:6px;"></div>';
+
+            wireCard(card, ent);
+            return card;
+        }
+
+        function wireCard(card, ent) {
+            card.querySelector('#name-' + ent.id).addEventListener('input', function (e) {
+                ent.name = e.target.value.trim();
+                updateKeysCaption(ent);
+                syncValidation();
+                renderAllPaths();
             });
-
-            document.querySelectorAll('.clear-btn').forEach(btn => {
-                btn.addEventListener('click', () => clearPath(btn.dataset.path));
+            card.querySelector('#dir-' + ent.id).addEventListener('change', function (e) {
+                ent.direction = e.target.value;
+                ent.directionGuessed = false;
+                const note = document.getElementById('note-' + ent.id);
+                if (note) note.textContent = '';
+                updateKeysCaption(ent);
+                syncValidation();
+                renderAllPaths();
             });
-
-            document.querySelectorAll('.path-entry input[type="text"]').forEach(input => {
-                input.addEventListener('input', () => {
+            ent.segments.forEach(function (_, i) {
+                card.querySelector('#seg-' + ent.id + '-' + i).addEventListener('input', function (e) {
+                    ent.segments[i] = e.target.value;
                     renderAllPaths();
                 });
             });
-
-            // Align select and label input listeners for labels
-            for (const name of Object.keys(labelPathDefs)) {
-                const select = document.getElementById(`align-${name}`);
-                if (select) {
-                    select.addEventListener('change', () => renderAllPaths());
-                }
-                
-                const labelInput = document.getElementById(`label-${name}`);
-                if (labelInput) {
-                    labelInput.addEventListener('input', () => {
-                        // Update preview
-                        const previewLabel = document.getElementById(`preview-label-${name}`);
-                        if (previewLabel) {
-                            previewLabel.textContent = labelInput.value || name.toUpperCase();
-                        }
-                        renderAllPaths();
-                    });
-                }
-            }
+            card.querySelector('#lblpos-' + ent.id).addEventListener('input', function (e) {
+                ent.labelPosition = e.target.value;
+                renderAllPaths();
+            });
+            card.querySelector('#lbltext-' + ent.id).addEventListener('input', function (e) {
+                ent.label = e.target.value;
+                renderAllPaths();
+            });
+            card.querySelector('#align-' + ent.id).addEventListener('change', function (e) {
+                ent.align = e.target.value;
+                renderAllPaths();
+            });
+            card.querySelectorAll('.draw-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const seg = btn.dataset.seg != null ? parseInt(btn.dataset.seg, 10) : null;
+                    startDrawing(btn.dataset.entity, btn.dataset.kind, seg);
+                });
+            });
+            // .seg-add / .seg-remove / .entity-delete are wired in Task 5
+            updateKeysCaption(ent);
         }
+
+        function renderCards() {
+            entityCardsContainer.innerHTML = '';
+            entities.forEach(function (ent) { entityCardsContainer.appendChild(createCard(ent)); });
+            syncValidation();
+        }
+
+        function setModel(entityList) {
+            // Stop any in-progress drawing whose target may no longer exist.
+            currentDrawTarget = null;
+            entities = entityList;
+            renderCards();
+            renderAllPaths();
+        }
+
+        // Placeholder until Task 6 wires real validation. Keeps render calls safe.
+        function syncValidation() {}
+
+        function init() {
+            setModel(defaultEntityList());
+            addEntityBtn.addEventListener('click', onAddEntity);
+        }
+
+        // onAddEntity is defined in Task 5.
+        function onAddEntity() {}
+
 
         // Image loading
         function onImageLoad() {
@@ -687,42 +743,33 @@
             });
         }
 
-        // Render all paths to SVG
         function renderAllPaths() {
             if (!imageLoaded) return;
 
-            // Clear existing paths (keep defs)
             const defs = overlay.querySelector('defs');
             overlay.innerHTML = '';
             overlay.appendChild(defs);
 
-            // Render route paths
-            for (const name of Object.keys(routePathDefs)) {
-                const input = document.getElementById(`path-${name}`);
-                if (input && input.value.trim()) {
-                    renderRoutePath(name, input.value.trim());
+            entities.forEach(function (ent) {
+                ent.segments.forEach(function (seg, i) {
+                    if (seg && seg.trim()) {
+                        const active = !!currentDrawTarget && currentDrawTarget.entityId === ent.id &&
+                            currentDrawTarget.kind === 'segment' && currentDrawTarget.segIndex === i;
+                        renderRoutePath(seg.trim(), active);
+                    }
+                });
+                if (ent.labelPosition && ent.labelPosition.trim()) {
+                    const active = !!currentDrawTarget && currentDrawTarget.entityId === ent.id && currentDrawTarget.kind === 'label';
+                    renderLabelPath(ent.labelPosition.trim(), ent.align, ent, active);
                 }
-            }
+            });
 
-            // Render label paths
-            for (const name of Object.keys(labelPathDefs)) {
-                const input = document.getElementById(`path-${name}`);
-                const alignSelect = document.getElementById(`align-${name}`);
-                if (input && input.value.trim()) {
-                    const align = alignSelect ? alignSelect.value : labelPathDefs[name].align;
-                    renderLabelPath(name, input.value.trim(), align, labelPathDefs[name]);
-                }
-            }
-
-            // Render drawing points if actively drawing
-            if (currentDrawingPath) {
-                renderDrawingPoints();
-            }
+            if (currentDrawTarget) renderDrawingPoints();
         }
 
-        function renderRoutePath(name, pathData) {
+
+        function renderRoutePath(pathData, isActive) {
             const svgNS = "http://www.w3.org/2000/svg";
-            const isActive = currentDrawingPath === name;
             
             const path = document.createElementNS(svgNS, "path");
             path.setAttribute("d", scalePath(pathData));
@@ -730,7 +777,6 @@
             path.setAttribute("stroke-opacity", "0.6");
             path.setAttribute("stroke-width", getStrokeWidth().toFixed(1));
             path.setAttribute("fill", "none");
-            path.setAttribute("data-name", name);
             overlay.appendChild(path);
             
             // Add start/end markers to show direction
@@ -762,17 +808,16 @@
             }
         }
 
-        function renderLabelPath(name, pathData, align, def) {
+        function renderLabelPath(pathData, align, ent, isActive) {
             const svgNS = "http://www.w3.org/2000/svg";
             
             // Draw the path line
             const path = document.createElementNS(svgNS, "path");
             path.setAttribute("d", scalePath(pathData));
-            path.setAttribute("stroke", currentDrawingPath === name ? "#ffd700" : INACTIVE_ROUTE_COLOR);
+            path.setAttribute("stroke", isActive ? "#ffd700" : INACTIVE_ROUTE_COLOR);
             path.setAttribute("stroke-opacity", "0.7");
             path.setAttribute("stroke-width", getLabelStrokeWidth().toFixed(1));
             path.setAttribute("fill", "none");
-            path.setAttribute("data-name", name);
             overlay.appendChild(path);
 
             // Get path endpoints for text positioning
@@ -791,11 +836,9 @@
             valueText.setAttribute("text-anchor", "start");
             valueText.setAttribute("font-size", getLabelValueFontSize().toFixed(1));
             valueText.setAttribute("font-family", "system-ui, -apple-system, sans-serif");
-            valueText.textContent = def.dummyValue;
+            valueText.textContent = ent.dummyValue;
 
-            // Name text - use label from input field if available
-            const labelInput = document.getElementById(`label-${name}`);
-            const labelText = labelInput ? labelInput.value : (def.label || name.toUpperCase());
+            const labelText = ent.label || ent.name.toUpperCase();
             
             const nameText = document.createElementNS(svgNS, "text");
             nameText.setAttribute("fill", "#7d7f82");
@@ -811,7 +854,7 @@
             subText.setAttribute("text-anchor", "start");
             subText.setAttribute("font-size", getLabelSubFontSize().toFixed(1));
             subText.setAttribute("font-family", "system-ui, -apple-system, sans-serif");
-            subText.textContent = def.dummySublabel;
+            subText.textContent = ent.dummySublabel;
 
             if (align === "top") {
                 valueText.setAttribute("dominant-baseline", "hanging");
@@ -895,40 +938,35 @@
             });
         }
 
-        // Drawing mode
-        function startDrawing(pathName, isLabel) {
-            // Deactivate previous
-            document.querySelectorAll('.path-entry').forEach(e => e.classList.remove('active'));
-            document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
+        function startDrawing(entityId, kind, segIndex) {
+            document.querySelectorAll('.path-entry').forEach(function (e) { e.classList.remove('active'); });
+            document.querySelectorAll('.draw-btn').forEach(function (b) { b.classList.remove('active'); });
 
-            if (currentDrawingPath === pathName) {
-                // Toggle off
-                stopDrawing();
-            } else {
-                // Activate
-                currentDrawingPath = pathName;
-                currentPoints = [];
-                mousePos = null;
-                // Reset to Move mode for fresh drawing (first click will be M, then auto-switch to L)
-                drawMode = 'M';
-                moveBtn.classList.add('active');
-                lineBtn.classList.remove('active');
-                document.getElementById(`entry-${pathName}`).classList.add('active');
-                document.querySelector(`.draw-btn[data-path="${pathName}"]`).classList.add('active');
-                modeIndicator.textContent = `Drawing: ${pathName}`;
-                overlay.classList.add('interactive');
-                endBtn.style.display = 'inline-block';
-            }
-            
+            const same = currentDrawTarget && currentDrawTarget.entityId === entityId &&
+                currentDrawTarget.kind === kind && currentDrawTarget.segIndex === segIndex;
+            if (same) { stopDrawing(); return; }
+
+            currentDrawTarget = { entityId: entityId, kind: kind, segIndex: (segIndex == null ? null : segIndex) };
+            currentPoints = [];
+            mousePos = null;
+            drawMode = 'M';
+            moveBtn.classList.add('active');
+            lineBtn.classList.remove('active');
+
+            const card = document.getElementById('card-' + entityId);
+            if (card) card.classList.add('active');
+            const ent = findEntity(entityId);
+            const what = kind === 'segment' ? ('segment ' + (segIndex + 1)) : 'label';
+            modeIndicator.textContent = 'Drawing: ' + (ent ? ent.name : '?') + ' ' + what;
+            overlay.classList.add('interactive');
+            endBtn.style.display = 'inline-block';
             renderAllPaths();
         }
-        
+
         function stopDrawing() {
-            if (currentDrawingPath) {
-                document.querySelectorAll('.path-entry').forEach(e => e.classList.remove('active'));
-                document.querySelectorAll('.draw-btn').forEach(b => b.classList.remove('active'));
-            }
-            currentDrawingPath = null;
+            document.querySelectorAll('.path-entry').forEach(function (e) { e.classList.remove('active'); });
+            document.querySelectorAll('.draw-btn').forEach(function (b) { b.classList.remove('active'); });
+            currentDrawTarget = null;
             currentPoints = [];
             mousePos = null;
             modeIndicator.textContent = "Click a path's \"Draw\" button to start";
@@ -937,22 +975,25 @@
             renderAllPaths();
         }
 
-        function clearPath(pathName) {
-            const input = document.getElementById(`path-${pathName}`);
-            if (input) {
-                input.value = '';
-                
-                // If clearing the currently active drawing path, reset drawing state
-                if (currentDrawingPath === pathName) {
-                    currentPoints = [];
-                    // Reset to Move mode for fresh drawing
-                    drawMode = 'M';
-                    moveBtn.classList.add('active');
-                    lineBtn.classList.remove('active');
-                }
-                
-                renderAllPaths();
+        // Read/write the model field the current draw target points at.
+        function getTargetField() {
+            const ent = findEntity(currentDrawTarget.entityId);
+            if (!ent) return null;
+            if (currentDrawTarget.kind === 'label') {
+                return { get: function () { return ent.labelPosition; }, set: function (v) { ent.labelPosition = v; } };
             }
+            const i = currentDrawTarget.segIndex;
+            return { get: function () { return ent.segments[i]; }, set: function (v) { ent.segments[i] = v; } };
+        }
+
+        function syncTargetInput() {
+            const ent = findEntity(currentDrawTarget.entityId);
+            if (!ent) return;
+            const input = currentDrawTarget.kind === 'label'
+                ? document.getElementById('lblpos-' + ent.id)
+                : document.getElementById('seg-' + ent.id + '-' + currentDrawTarget.segIndex);
+            const field = getTargetField();
+            if (input && field) input.value = field.get();
         }
 
         // Snap point to 0°, 90°, 180°, 270° relative to last point
@@ -972,21 +1013,18 @@
             };
         }
 
-        // Canvas click handler
         canvasContainer.addEventListener('click', (e) => {
-            if (!currentDrawingPath || !imageLoaded) return;
+            if (!currentDrawTarget || !imageLoaded) return;
 
             const rect = baseImage.getBoundingClientRect();
             const scaleX = baseImage.naturalWidth / rect.width;
             const scaleY = baseImage.naturalHeight / rect.height;
-            
-            // Get click position in original (unscaled) coordinates
+
             const rawX = (e.clientX - rect.left) * scaleX / scaleFactor;
             const rawY = (e.clientY - rect.top) * scaleY / scaleFactor;
             let x = Math.round(rawX);
             let y = Math.round(rawY);
-            
-            // Snap to cardinal directions if Shift is held in Line mode
+
             if (e.shiftKey && drawMode === 'L' && currentPoints.length > 0) {
                 const lastPoint = currentPoints[currentPoints.length - 1];
                 const snapped = snapToCardinal(lastPoint, x, y);
@@ -996,19 +1034,16 @@
 
             currentPoints.push({ x, y });
 
-            // Build path string
-            const input = document.getElementById(`path-${currentDrawingPath}`);
+            const field = getTargetField();
             if (currentPoints.length === 1) {
-                // First point is always Move
-                input.value = `M ${x} ${y}`;
-                // Auto-switch to Line mode after first point
+                field.set(`M ${x} ${y}`);
                 drawMode = 'L';
                 lineBtn.classList.add('active');
                 moveBtn.classList.remove('active');
             } else {
-                input.value += ` ${drawMode} ${x} ${y}`;
+                field.set(field.get() + ` ${drawMode} ${x} ${y}`);
             }
-
+            syncTargetInput();
             renderAllPaths();
         });
 
@@ -1024,7 +1059,7 @@
             let y = Math.round((e.clientY - rect.top) * scaleY / scaleFactor);
             
             // Update mouse position for line preview
-            if (currentDrawingPath && drawMode === 'L' && currentPoints.length > 0) {
+            if (currentDrawTarget && drawMode === 'L' && currentPoints.length > 0) {
                 // Snap to cardinal directions if Shift is held
                 if (e.shiftKey) {
                     const lastPoint = currentPoints[currentPoints.length - 1];
@@ -1082,59 +1117,42 @@
 
         // Export for Node-RED node configuration (JSON format)
         exportBtn.addEventListener('click', () => {
-            // Build energyPaths object
+            const descriptors = buildDescriptors();
             const energyPaths = {};
-            
-            // Group inverterToHome paths into array if multiple exist
-            const homePaths = [];
-            for (const name of Object.keys(routePathDefs)) {
-                const input = document.getElementById(`path-${name}`);
-                if (input && input.value.trim()) {
-                    if (name.startsWith('inverterToHome')) {
-                        homePaths.push(input.value.trim());
+            const labels = {};
+
+            descriptors.forEach(function (d) {
+                if (d.segments && d.segments.length) {
+                    if (d.segments.length === 1) {
+                        const routes = Topology.deriveTopology({ [d.name]: { direction: d.direction } }).routes;
+                        Object.keys(routes).forEach(function (routeName) {
+                            if (d.segments[0] && d.segments[0].trim()) {
+                                energyPaths[routeName] = d.segments[0].trim();
+                            }
+                        });
                     } else {
-                        energyPaths[name] = input.value.trim();
+                        const routes = Topology.deriveTopology({ [d.name]: { direction: d.direction } }).routes;
+                        const routeNames = Object.keys(routes);
+                        d.segments.forEach(function (seg, i) {
+                            if (seg && seg.trim() && routeNames[i]) {
+                                energyPaths[routeNames[i]] = seg.trim();
+                            }
+                        });
                     }
                 }
-            }
-            
-            // Add home paths - as array if multiple, single string if one
-            if (homePaths.length === 1) {
-                energyPaths.inverterToHome = homePaths[0];
-            } else if (homePaths.length > 1) {
-                energyPaths.inverterToHome = homePaths;
-            }
-
-            // Build labels object
-            const labels = {};
-            for (const name of Object.keys(labelPathDefs)) {
-                const input = document.getElementById(`path-${name}`);
-                const alignSelect = document.getElementById(`align-${name}`);
-				const labelName = document.getElementById(`label-${name}`);
-                if (input && input.value.trim()) {
-                    const align = alignSelect ? alignSelect.value : labelPathDefs[name].align;
-                    labels[name] = {
-                        position: input.value.trim(),
-                        align: align,
-						text: labelName.value.trim()
-                    };
+                if (d.labelPosition && d.labelPosition.trim()) {
+                    labels[d.name] = { position: d.labelPosition.trim(), align: d.align, text: d.label };
                 }
-            }
+            });
 
-            const exportObj = {
-                energyPaths: energyPaths,
-                labels: labels
-            };
-
+            const exportObj = { energyPaths: energyPaths, labels: labels };
             const output = JSON.stringify(exportObj, null, 2);
             exportArea.value = output;
 
             navigator.clipboard.writeText(output).then(() => {
                 const originalText = exportBtn.textContent;
                 exportBtn.textContent = 'Copied!';
-                setTimeout(() => {
-                    exportBtn.textContent = originalText;
-                }, 1500);
+                setTimeout(() => { exportBtn.textContent = originalText; }, 1500);
             });
         });
 
@@ -1184,41 +1202,30 @@
                     return;
                 }
 
-                // Load energyPaths
-                if (parsed.energyPaths) {
-                    for (const [name, value] of Object.entries(parsed.energyPaths)) {
-                        if (name === 'inverterToHome') {
-                            // Handle array or single path for inverterToHome
-                            const paths = Array.isArray(value) ? value : [value];
-                            paths.forEach((path, index) => {
-                                const inputId = index === 0 ? 'path-inverterToHome1' : `path-inverterToHome${index + 1}`;
-                                const pathInput = document.getElementById(inputId);
-                                if (pathInput) {
-                                    pathInput.value = path;
-                                }
-                            });
-                        } else {
-                            const pathInput = document.getElementById(`path-${name}`);
-                            if (pathInput) {
-                                pathInput.value = value;
-                            }
-                        }
-                    }
+                // Rebuild entity model from the loaded JSON.
+                // TracerIO.descriptorsFromExport converts the old energyPaths+labels
+                // format to entity descriptors; fall back to raw import if unavailable.
+                let newEntities = null;
+                if (typeof TracerIO !== 'undefined' && TracerIO.descriptorsFromExport) {
+                    const descriptors = TracerIO.descriptorsFromExport(parsed);
+                    newEntities = descriptors.map(descriptorToEntity);
+                } else if (parsed.labels) {
+                    // Minimal fallback: build from labels only
+                    newEntities = Object.keys(parsed.labels).map(function (name) {
+                        const labelData = parsed.labels[name];
+                        return descriptorToEntity({
+                            name: name,
+                            direction: Topology.DEFAULT_ENTITIES[name] ? Topology.DEFAULT_ENTITIES[name].direction : 'both',
+                            segments: [],
+                            labelPosition: labelData.position || '',
+                            label: labelData.text || name.toUpperCase(),
+                            align: labelData.align || 'top'
+                        });
+                    });
                 }
 
-                // Load labels
-                if (parsed.labels) {
-                    for (const [name, labelData] of Object.entries(parsed.labels)) {
-                        const pathInput = document.getElementById(`path-${name}`);
-                        if (pathInput && labelData.position) {
-                            pathInput.value = labelData.position;
-                        }
-
-                        const alignSelect = document.getElementById(`align-${name}`);
-                        if (alignSelect && labelData.align) {
-                            alignSelect.value = labelData.align;
-                        }
-                    }
+                if (newEntities && newEntities.length) {
+                    setModel(newEntities);
                 }
 
                 loadJsonModal.style.display = 'none';
@@ -1230,7 +1237,7 @@
         });
 
         // Initialize
-        initUI();
+        init();
     </script>
 </body>
 
