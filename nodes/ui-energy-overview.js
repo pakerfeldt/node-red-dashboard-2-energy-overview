@@ -1,3 +1,5 @@
+const { deriveTopology, parseEntities, DEFAULT_ENTITIES } = require('./topology')
+
 module.exports = function(RED) {
 	const path = require('path')
 
@@ -57,19 +59,15 @@ module.exports = function(RED) {
 		strokeWidth: { min: 1, max: 10, default: 3.2 }
 	}
 
-	const BIDIRECTIONAL_ROUTES = {
-		inverterToGrid: 'gridToInverter',
-		gridToInverter: 'inverterToGrid',
-		inverterToBattery: 'batteryToInverter',
-		batteryToInverter: 'inverterToBattery',
-		inverterToCar: 'carToInverter',
-		carToInverter: 'inverterToCar'
-	}
-
 	function UIEnergyOverviewNode(config) {
 		RED.nodes.createNode(this, config)
 
 		const node = this
+
+		// Derive the bidirectional route map from the configured entities
+		// (falls back to the built-in set). Single source of truth: ./topology.
+		const entities = parseEntities(config.customPaths) || DEFAULT_ENTITIES
+		const BIDIRECTIONAL_ROUTES = deriveTopology(entities).bidirectional
 
 		const group = RED.nodes.getNode(config.group)
 
