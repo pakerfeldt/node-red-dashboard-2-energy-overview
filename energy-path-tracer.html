@@ -699,8 +699,46 @@
             renderAllPaths();
         }
 
-        // Placeholder until Task 6 wires real validation. Keeps render calls safe.
-        function syncValidation() {}
+        function buildEntitiesObj() {
+            const obj = {};
+            entities.forEach(function (e) { obj[e.name] = { direction: e.direction }; });
+            return obj;
+        }
+
+        function syncValidation() {
+            // Clear per-card errors.
+            entities.forEach(function (e) {
+                const err = document.getElementById('err-' + e.id);
+                if (err) err.textContent = '';
+            });
+
+            const result = Topology.validateEntities(buildEntitiesObj());
+            // Attach each error to the first card whose name it mentions, else summary-only.
+            const unattached = [];
+            result.errors.forEach(function (msg) {
+                const hit = entities.find(function (e) { return e.name && msg.indexOf('"' + e.name + '"') !== -1; });
+                const target = hit ? document.getElementById('err-' + hit.id) : null;
+                if (target) { target.textContent += (target.textContent ? ' ' : '') + msg; }
+                else { unattached.push(msg); }
+            });
+
+            const pathCount = entities.reduce(function (n, e) {
+                return n + e.segments.filter(function (s) { return s && s.trim(); }).length;
+            }, 0);
+            const labelCount = entities.filter(function (e) { return e.labelPosition && e.labelPosition.trim(); }).length;
+
+            if (result.valid) {
+                validationSummary.style.color = '#888';
+                validationSummary.textContent = entities.length + ' entities, ' + pathCount + ' paths, ' + labelCount + ' labels';
+            } else {
+                validationSummary.style.color = '#ef4444';
+                validationSummary.textContent = result.errors.length + ' error(s) — fix before exporting' +
+                    (unattached.length ? ': ' + unattached.join('; ') : '');
+            }
+            exportBtn.disabled = !result.valid;
+            exportBtn.style.opacity = result.valid ? '1' : '0.5';
+            exportBtn.style.cursor = result.valid ? 'pointer' : 'not-allowed';
+        }
 
         function init() {
             setModel(defaultEntityList());
