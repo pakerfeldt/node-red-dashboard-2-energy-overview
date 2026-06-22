@@ -100,3 +100,15 @@ test('parseEntities returns null for blank/invalid/entity-less input and the obj
     const ok = JSON.stringify({ entities: { generator: { direction: 'source' } } })
     assert.deepStrictEqual(parseEntities(ok), { generator: { direction: 'source' } })
 })
+
+test('module exposes the full api surface used by the browser tracer', () => {
+    const topology = require('../nodes/topology')
+    assert.strictEqual(typeof topology.deriveTopology, 'function')
+    assert.strictEqual(typeof topology.validateEntities, 'function')
+    assert.strictEqual(typeof topology.capitalize, 'function')
+    assert.strictEqual(typeof topology.toInverterKey, 'function')
+    assert.strictEqual(typeof topology.fromInverterKey, 'function')
+    assert.strictEqual(topology.toInverterKey('grid'), 'gridToInverter')
+    assert.strictEqual(topology.fromInverterKey('grid'), 'inverterToGrid')
+    assert.ok(topology.DEFAULT_ENTITIES && topology.DEFAULT_ENTITIES.solar)
+})

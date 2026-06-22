@@ -138,10 +138,20 @@ function parseEntities (customPathsString) {
 	return parsed.entities
 }
 
-module.exports = {
+var api = {
 	DEFAULT_ENTITIES: DEFAULT_ENTITIES,
 	deriveTopology: deriveTopology,
 	matchPulseGroups: matchPulseGroups,
 	validateEntities: validateEntities,
-	parseEntities: parseEntities
+	parseEntities: parseEntities,
+	capitalize: capitalize,
+	toInverterKey: toInverterKey,
+	fromInverterKey: fromInverterKey
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports = api
+}
+if (typeof window !== 'undefined') {
+	window.Topology = api
 }
