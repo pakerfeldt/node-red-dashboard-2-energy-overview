@@ -1,4 +1,45 @@
 <script type="text/javascript">
+    // Mirror of validateEntities() in nodes/topology.js for editor-side feedback.
+    // The runtime (node + component) is authoritative; this is UX only.
+    function validateEnergyEntities(entities) {
+        var errors = [];
+        var validDirections = ['source', 'sink', 'both'];
+        var nameRe = /^[A-Za-z][A-Za-z0-9_]*$/;
+        if (typeof entities !== 'object' || entities === null || Array.isArray(entities)) {
+            return { valid: false, errors: ['entities must be an object'] };
+        }
+        var names = Object.keys(entities);
+        if (names.length === 0) {
+            return { valid: false, errors: ['entities must declare at least one entity'] };
+        }
+        var seen = {};
+        names.forEach(function (name) {
+            if (!nameRe.test(name)) {
+                errors.push('Invalid entity name "' + name + '"');
+            }
+            if (name.toLowerCase() === 'inverter') {
+                errors.push('Reserved entity name "' + name + '"');
+            }
+            var direction = entities[name] && entities[name].direction;
+            if (validDirections.indexOf(direction) === -1) {
+                errors.push('Entity "' + name + '" has invalid direction "' + direction + '"');
+                return;
+            }
+            var cap = name.charAt(0).toUpperCase() + name.slice(1);
+            var keys = direction === 'source' ? [name + 'ToInverter']
+                : direction === 'sink' ? ['inverterTo' + cap]
+                    : ['inverterTo' + cap, name + 'ToInverter'];
+            keys.forEach(function (k) {
+                if (seen[k]) {
+                    errors.push('Duplicate route "' + k + '"');
+                } else {
+                    seen[k] = name;
+                }
+            });
+        });
+        return { valid: errors.length === 0, errors: errors };
+    }
+
     RED.nodes.registerType('ui-energy-overview', {
         category: RED._('@flowfuse/node-red-dashboard/ui-base:ui-base.label.category'),
         color: RED._('@flowfuse/node-red-dashboard/ui-base:ui-base.colors.light'),
@@ -20,12 +61,15 @@
             height: { value: 0 },
             pulseColor: { value: "#4dcbbf" },
             image: { value: "" },
-            customPaths: { 
+            customPaths: {
                 value: "",
                 validate: function(v) {
                     if (!v || v.trim() === "") return true
                     try {
                         const parsed = JSON.parse(v)
+                        if (parsed.entities) {
+                            return validateEnergyEntities(parsed.entities).valid && !!parsed.energyPaths && !!parsed.labels
+                        }
                         return parsed.energyPaths && parsed.labels
                     } catch (e) {
                         return false
@@ -113,6 +157,25 @@
                 }
                 try {
                     const parsed = JSON.parse(value);
+                    if (parsed.entities) {
+                        const result = validateEnergyEntities(parsed.entities);
+                        if (!result.valid) {
+                            $validationStatus.html('<span style="color: #d55;">Entity errors: ' + result.errors.join('; ') + '</span>');
+                            $customPaths.addClass('input-error');
+                            return;
+                        }
+                        if (!parsed.energyPaths || !parsed.labels) {
+                            $validationStatus.html('<span style="color: #d55;">entities provided but energyPaths and/or labels are missing</span>');
+                            $customPaths.addClass('input-error');
+                            return;
+                        }
+                        const entityCount = Object.keys(parsed.entities).length;
+                        const pathCount = Object.keys(parsed.energyPaths).length;
+                        const labelCount = Object.keys(parsed.labels).length;
+                        $validationStatus.html('<span style="color: #5a5;">Valid JSON: ' + entityCount + ' entities, ' + pathCount + ' energy paths, ' + labelCount + ' labels</span>');
+                        $customPaths.removeClass('input-error');
+                        return;
+                    }
                     if (parsed.energyPaths && parsed.labels) {
                         const pathCount = Object.keys(parsed.energyPaths).length;
                         const labelCount = Object.keys(parsed.labels).length;
@@ -322,7 +385,40 @@ msg.payload = {
   }
 }
     </pre>
-    
+
+    <h3>Custom Entities</h3>
+    <p>By default the widget shows five entities: solar, home, grid, battery and car. To define your own set (for example, add a Diesel Generator, or remove the car), include an <code>entities</code> block in the Custom Paths JSON. <strong>When <code>entities</code> is present it fully replaces the default set</strong>, so list every entity you want.</p>
+    <p>Each entity has a <code>direction</code> relative to the central inverter:</p>
+    <ul>
+        <li><code>source</code> — flows into the inverter (e.g. solar, generator). Route name: <code>&lt;name&gt;ToInverter</code>.</li>
+        <li><code>sink</code> — flows out of the inverter (e.g. home). Route name: <code>inverterTo&lt;Name&gt;</code>.</li>
+        <li><code>both</code> — bidirectional (e.g. grid, battery, car). Route names: <code>inverterTo&lt;Name&gt;</code> and <code>&lt;name&gt;ToInverter</code>.</li>
+    </ul>
+    <p>Provide matching geometry for each entity in <code>energyPaths</code> (keyed by the route name) and <code>labels</code> (keyed by the entity name). Example adding a generator:</p>
+    <pre>
+{
+  "entities": {
+    "solar":     { "direction": "source" },
+    "home":      { "direction": "sink" },
+    "grid":      { "direction": "both" },
+    "battery":   { "direction": "both" },
+    "generator": { "direction": "source" }
+  },
+  "energyPaths": {
+    "solarToInverter": "M ...",
+    "inverterToHome": ["M ...", "M ..."],
+    "inverterToGrid": "M ...",
+    "inverterToBattery": "M ...",
+    "generatorToInverter": "M ..."
+  },
+  "labels": {
+    "solar":     { "position": "M ...", "align": "top",    "text": "SOLAR" },
+    "generator": { "position": "M ...", "align": "bottom", "text": "GENERATOR" }
+  }
+}
+    </pre>
+    <p>Control the generator flow with <code>msg.payload.routes.generatorToInverter</code> and set its label with <code>msg.payload.labels.generator</code>.</p>
+
     <h3>Example Flow</h3>
     <pre>
 // Enable solar production flowing to home
