@@ -11,6 +11,7 @@ An energy flow visualization widget for Node-RED Dashboard 2.0 that displays rea
 
 - Animated pulse visualization showing energy flow direction
 - Support for bidirectional flows (grid import/export, battery charge/discharge)
+- Configurable entities — replace the built-in solar/home/grid/battery/car set with your own sources, sinks, and bidirectional flows
 - Customizable labels with values and sublabels
 - Dynamic pulse color configuration
 - Custom house image support
@@ -64,6 +65,8 @@ msg.payload = {
 
 Labels are merged with existing values, so you can update individual labels without resending all of them.
 
+The route and label keys above are the built-in defaults. With [custom entities](#custom-entities), the keys are derived from your own entity names instead.
+
 ### Reset State
 
 Use `msg.reset` to clear all stored routes and labels before applying new values:
@@ -114,7 +117,29 @@ return msg;
 |----------|-------------|---------|
 | Pulse Color | Color of the animated pulses | #4dcbbf |
 | Image URL | Custom background image URL | Built-in house image |
-| Custom Paths | JSON configuration for custom energy paths and label positions | (empty, uses defaults) |
+| Custom Paths | JSON `{ entities, energyPaths, labels }` defining [custom entities](#custom-entities) and their drawn paths/labels | (empty, uses defaults) |
+
+## Custom Entities
+
+By default the widget shows five entities: `solar` (source), `home` (sink), and `grid`, `battery`, `car` (bidirectional). Set the **Custom Paths** field to a JSON object with an `entities` block to replace that set with your own:
+
+```json
+{
+  "entities": {
+    "solar": { "direction": "source" },
+    "home": { "direction": "sink" },
+    "generator": { "direction": "source" }
+  },
+  "energyPaths": { "...": "drawn path geometry" },
+  "labels": { "...": "label positions" }
+}
+```
+
+- `direction` is `source` (into the inverter), `sink` (out of the inverter), or `both` (bidirectional).
+- Route keys are derived from the entity name: `source` → `<name>ToInverter`, `sink` → `inverterTo<Name>`, `both` → both. So a `generator` source is driven by `msg.payload.routes.generatorToInverter` and labelled via `msg.payload.labels.generator`.
+- Providing `entities` **replaces** the defaults entirely; omit it to keep them.
+
+Draw the `energyPaths` and `labels` geometry with the [Path Tracer Tool](#path-tracer-tool). For a full worked example, see the node's built-in help (the editor's info panel) and `examples/energy-overview-generator-example.json`.
 
 ## Custom House Image
 
@@ -127,6 +152,7 @@ To create custom paths for your image, you can use the included `energy-path-tra
 
 The Energy Path Tracer is an interactive web-based tool that helps you create custom energy flow paths for your house images. It provides a visual interface where you can:
 
+- **Manage entities**: add, rename, or delete entities and set each one's direction (source/sink/both)
 - **Click to trace paths**: Draw energy flow routes and label positions by clicking on your house image
 - **Snap to directions**: Hold Shift while drawing to snap lines to horizontal/vertical directions
 - **Import/Export configurations**: Save and load your path configurations as JSON
@@ -136,8 +162,8 @@ The Energy Path Tracer is an interactive web-based tool that helps you create cu
 ### How to use:
 1. Open the [Path Tracer Tool](https://pakerfeldt.github.io/node-red-dashboard-2-energy-overview/energy-path-tracer.html)
 2. Load a custom house image (or use the default)
-3. Click "Draw" next to any path to start tracing
-4. Click on the image to add points for your energy flow routes
+3. Add, rename, or delete entities and set each one's direction (source/sink/both)
+4. Click "Draw" on an entity's segment or label, then click on the image to trace it
 5. Export the generated JSON configuration
 6. Paste the JSON into your Node-RED energy overview node's "Custom Paths" field
 
