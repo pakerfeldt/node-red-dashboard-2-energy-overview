@@ -1,4 +1,5 @@
 const { deriveTopology, parseEntities, DEFAULT_ENTITIES } = require('./topology')
+const { mergePayload } = require('./payload-merge')
 
 module.exports = function(RED) {
 	const path = require('path')
@@ -123,46 +124,24 @@ module.exports = function(RED) {
 					})
 				}
 
+				// Read the node's stored state to merge against. On reset we still
+				// read it so we can switch its routes OFF explicitly: the component
+				// only deactivates a route on an explicit `false`, so clearing by
+				// omission (an empty {}) would leave the pulses animating.
+				const storedMsg = base.stores.data.get(node.id) || {}
+				const storedPayload = (storedMsg.payload && typeof storedMsg.payload === 'object') ? storedMsg.payload : {}
+
 				if (!msg.payload || typeof msg.payload !== 'object') {
 					if (shouldReset) {
-						// Reset with no payload - clear everything
-						msg.payload = { routes: {}, labels: {} }
+						// Reset with no payload - turn every stored route off.
+						msg.payload = mergePayload(storedPayload, {}, { reset: true, bidirectional: BIDIRECTIONAL_ROUTES })
 					}
 					return msg
 				}
 
-				// Get existing state (empty if resetting)
-				let existingPayload = {}
-				if (!shouldReset) {
-					const storedMsg = base.stores.data.get(node.id) || {}
-					existingPayload = (storedMsg.payload && typeof storedMsg.payload === 'object') ? storedMsg.payload : {}
-				}
-
-				// Deep merge routes: preserve existing routes not in the new message
-				const existingRoutes = existingPayload.routes || {}
-				const newRoutes = msg.payload.routes || {}
-				
-				Object.keys(newRoutes).forEach(function(routeName) {
-					if (newRoutes[routeName] === true && BIDIRECTIONAL_ROUTES[routeName]) {
-						const oppositeRoute = BIDIRECTIONAL_ROUTES[routeName]
-						if (newRoutes[oppositeRoute] === undefined) {
-							newRoutes[oppositeRoute] = false
-						}
-					}
-				})
-				
-				msg.payload.routes = {
-					...existingRoutes,
-					...newRoutes
-				}
-
-				// Deep merge labels: preserve existing labels not in the new message,
-				const existingLabels = existingPayload.labels || {}
-				const newLabels = msg.payload.labels || {}
-				msg.payload.labels = {
-					...existingLabels,
-					...newLabels
-				}
+				const merged = mergePayload(storedPayload, msg.payload, { reset: shouldReset, bidirectional: BIDIRECTIONAL_ROUTES })
+				msg.payload.routes = merged.routes
+				msg.payload.labels = merged.labels
 				return msg
 			},
 			onInput: function(msg, send, done) {
